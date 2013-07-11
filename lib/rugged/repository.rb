@@ -103,6 +103,10 @@ module Rugged
       Rugged::Reference.each_name(self, glob)
     end
 
+    def references
+      @references ||= ReferenceCollection.new(self)
+    end
+
     # All the tags in the repository.
     #
     # Returns an Enumerable::Enumerator containing all the String tag names.
