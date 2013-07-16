@@ -11,10 +11,6 @@ module Rugged
       Tag.new(@repo, @repo.references[name])
     end
 
-    def head
-      self["HEAD"]
-    end
-
     def each(&block)
       Tag.each(@repo, &block)
     end
