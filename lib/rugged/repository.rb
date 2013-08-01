@@ -107,6 +107,10 @@ module Rugged
       @references ||= ReferenceCollection.new(self)
     end
 
+    def branches
+      @branches ||= Rugged::BranchCollection.new(self)
+    end
+
     # All the tags in the repository.
     #
     # Returns an Enumerable::Enumerator containing all the String tag names.
@@ -120,13 +124,6 @@ module Rugged
     # the repository.
     def remotes
       Rugged::Remote.each(self)
-    end
-
-    # All the branches in the repository
-    #
-    # Returns an Enumerable::Enumerator containing Rugged::Branch objects
-    def branches
-      Rugged::Branch.each(self)
     end
 
     # Create a new branch in the repository

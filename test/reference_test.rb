@@ -38,7 +38,7 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_can_open_reference
-    ref = Rugged::Reference.lookup(@repo, "refs/heads/master")
+    ref = @repo.references["refs/heads/master"]
     assert_equal "36060c58702ed4c2a40832c51758d5344201d89a", ref.target
     assert_equal :direct, ref.type
     assert_equal "refs/heads/master", ref.name
@@ -47,7 +47,7 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_can_open_a_symbolic_reference
-    ref = Rugged::Reference.lookup(@repo, "HEAD")
+    ref = @repo.references["HEAD"]
     assert_equal "refs/heads/master", ref.target
     assert_equal :symbolic, ref.type
 
@@ -58,12 +58,12 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_looking_up_missing_ref_returns_nil
-    ref = Rugged::Reference.lookup(@repo, "lol/wut")
+    ref = @repo.references["lol/wut"]
     assert_equal nil, ref
   end
 
   def test_load_reflog
-    ref = Rugged::Reference.lookup(@repo, "refs/heads/master")
+    ref = @repo.references["refs/heads/master"]
     log = ref.log
     e =  log[1]
     assert_equal e[:id_old], "8496071c1b46c854b31185ea97743be6a8774479"
@@ -81,14 +81,14 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_load_packed_ref
-    ref = Rugged::Reference.lookup(@repo, "refs/heads/packed")
+    ref = @repo.references["refs/heads/packed"]
     assert_equal "41bc8c69075bbdb46c5c6f0566cc8cc5b46e8bd9", ref.target
     assert_equal :direct, ref.type
     assert_equal "refs/heads/packed", ref.name
   end
 
   def test_resolve_head
-    ref = Rugged::Reference.lookup(@repo, "HEAD")
+    ref = @repo.references["HEAD"]
     assert_equal "refs/heads/master", ref.target
     assert_equal :symbolic, ref.type
 
@@ -98,7 +98,7 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_reference_to_tag
-    ref = Rugged::Reference.lookup(@repo, "refs/tags/v1.0")
+    ref = @repo.references["refs/tags/v1.0"]
 
     assert_equal "0c37a5391bbff43c37f0d0371823a5509eed5b1d", ref.target
     assert_equal "5b5b025afb0b4c913b4c338a42934a3863bf3644", ref.peel

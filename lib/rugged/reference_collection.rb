@@ -21,13 +21,20 @@ module Rugged
       Reference.valid_name?(name)
     end
 
-    def rename(ref, new_name, force = false)
-      ref = self[ref] if ref.kind_of?(String)
+    def rename(ref_or_name, new_name, force = false)
+      ref = ref_or_name if ref_or_name.kind_of?(Reference)
+      ref ||= self[ref_or_name]
+
+      unless ref
+        raise InvalidError.new("Reference '#{ref_or_name}' doesn't exist. One cannot move a non existing reference.")
+      end
+
       ref.rename(new_name, force)
     end
 
-    def update(ref, target)
-      ref = self[ref] if ref.kind_of?(String)
+    def update(ref_or_name, target)
+      ref = ref_or_name if ref_or_name.kind_of?(Reference)
+      ref ||= self[ref_or_name]
 
       if ref.name == "HEAD"
         self.add("HEAD", target, true)
@@ -36,9 +43,9 @@ module Rugged
       end
     end
 
-    def delete(ref)
-      ref = self[ref] if ref.kind_of?(String)
-
+    def delete(ref_or_name)
+      ref = ref_or_name if ref_or_name.kind_of?(Reference)
+      ref ||= self[ref_or_name]
       ref.delete!
     end
   end

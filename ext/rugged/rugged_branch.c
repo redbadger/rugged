@@ -30,7 +30,7 @@ extern VALUE rb_cRuggedObject;
 extern VALUE rb_cRuggedReference;
 VALUE rb_cRuggedBranch;
 
-static inline VALUE rugged_branch_new(VALUE owner, git_reference *ref)
+inline VALUE rugged_branch_new(VALUE owner, git_reference *ref)
 {
 	return rugged_ref_new(rb_cRuggedBranch, owner, ref);
 }
@@ -157,103 +157,6 @@ static VALUE rb_git_branch_delete(VALUE self)
 	);
 
 	return Qnil;
-}
-
-static int cb_branch__each_name(const char *branch_name, git_branch_t branch_type, void *data)
-{
-	struct rugged_cb_payload *payload = data;
-
-	rb_protect(rb_yield, rb_str_new_utf8(branch_name), &payload->exception);
-
-	return payload->exception ? GIT_ERROR : GIT_OK;
-}
-
-static int cb_branch__each_obj(const char *branch_name, git_branch_t branch_type, void *data)
-{
-	git_reference *branch;
-	git_repository *repo;
-	struct rugged_cb_payload *payload = data;
-
-	Data_Get_Struct(payload->rb_data, git_repository, repo);
-
-	rugged_exception_check(
-		git_branch_lookup(&branch, repo, branch_name, branch_type)
-	);
-
-	rb_protect(rb_yield, rugged_branch_new(payload->rb_data, branch), &payload->exception);
-	return payload->exception ? GIT_ERROR : GIT_OK;
-}
-
-static VALUE each_branch(int argc, VALUE *argv, VALUE self, int branch_names_only)
-{
-	VALUE rb_repo, rb_filter;
-	git_repository *repo;
-	int error;
-	struct rugged_cb_payload payload;
-	int filter = (GIT_BRANCH_LOCAL | GIT_BRANCH_REMOTE);
-
-	rb_scan_args(argc, argv, "11", &rb_repo, &rb_filter);
-
-	payload.exception = 0;
-	payload.rb_data = rb_repo;
-
-	if (!rb_block_given_p()) {
-		VALUE symbol = branch_names_only ? CSTR2SYM("each_name") : CSTR2SYM("each");
-		return rb_funcall(self, rb_intern("to_enum"), 3, symbol, rb_repo, rb_filter);
-	}
-
-	rugged_check_repo(rb_repo);
-
-	if (!NIL_P(rb_filter))
-		filter = parse_branch_type(rb_filter);
-
-	Data_Get_Struct(rb_repo, git_repository, repo);
-
-	if (branch_names_only) {
-		error = git_branch_foreach(repo, filter, &cb_branch__each_name, &payload);
-	} else {
-		error = git_branch_foreach(repo, filter, &cb_branch__each_obj, &payload);
-	}
-
-	if (payload.exception)
-		rb_jump_tag(payload.exception);
-	rugged_exception_check(error);
-
-	return Qnil;
-}
-
-/*
- *  call-seq:
- *    Branch.each_name(repository, filter = :all) { |branch_name| block }
- *    Branch.each_name(repository, filter = :all) -> enumerator
- *
- *  Iterate through the names of the branches in +repository+. Iteration can be
- *  optionally filtered to yield only +:local+ or +:remote+ branches.
- *
- *  The given block will be called once with the name of each branch as a +String+.
- *  If no block is given, an enumerator will be returned.
- */
-static VALUE rb_git_branch_each_name(int argc, VALUE *argv, VALUE self)
-{
-	return each_branch(argc, argv, self, 1);
-}
-
-
-/*
- *  call-seq:
- *    Branch.each(repository, filter = :all) { |branch| block }
- *    Branch.each(repository, filter = :all) -> enumerator
- *
- *  Iterate through the branches in +repository+. Iteration can be
- *  optionally filtered to yield only +:local+ or +:remote+ branches.
- *
- *  The given block will be called once with a +Rugged::Branch+ object
- *  for each branch in the repository. If no block is given, an enumerator
- *  will be returned.
- */
-static VALUE rb_git_branch_each(int argc, VALUE *argv, VALUE self)
-{
-	return each_branch(argc, argv, self, 0);
 }
 
 /*
@@ -456,8 +359,6 @@ void Init_rugged_branch(void)
 
 	rb_define_singleton_method(rb_cRuggedBranch, "create", rb_git_branch_create, -1);
 	rb_define_singleton_method(rb_cRuggedBranch, "lookup", rb_git_branch_lookup, -1);
-	rb_define_singleton_method(rb_cRuggedBranch, "each_name", rb_git_branch_each_name, -1);
-	rb_define_singleton_method(rb_cRuggedBranch, "each", rb_git_branch_each, -1);
 
 	rb_define_method(rb_cRuggedBranch, "delete!", rb_git_branch_delete, 0);
 	rb_define_method(rb_cRuggedBranch, "rename", rb_git_branch_move, -1);
