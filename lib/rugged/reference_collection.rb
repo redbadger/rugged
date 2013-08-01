@@ -1,39 +1,24 @@
 module Rugged
   class ReferenceCollection
-    include Enumerable
-
-    def initialize(repo)
-      @repo = repo
-    end
-
-    def [](name)
-      Reference.lookup(@repo, name) rescue nil
-    end
-
     def head
       self["HEAD"]
     end
 
     def each(&block)
-      Reference.each(@repo, &block)
+      Reference.each(@owner, &block)
     end
 
     def glob(pattern, &block)
-      Reference.each(@repo, pattern, &block)
+      Reference.each(@owner, pattern, &block)
     end
 
     def exists?(name)
-      Reference.exists?(@repo, name)
+      !!self[name]
     end
+    alias :exist? :exists?
 
     def valid_name?(name)
       Reference.valid_name?(name)
-    end
-
-    alias :exist? :exists?
-
-    def add(name, target, force = false)
-      Reference.create(@repo, name, target, force)
     end
 
     def rename(ref, new_name, force = false)

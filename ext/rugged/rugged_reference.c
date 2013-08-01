@@ -239,47 +239,6 @@ static VALUE rb_git_ref_exist(VALUE klass, VALUE rb_repo, VALUE rb_name)
 
 /*
  *  call-seq:
- *    Reference.create(repository, name, oid, force = false) -> new_ref
- *    Reference.create(repository, name, target, force = false) -> new_ref
- *
- *  Create a symbolic or direct reference on +repository+ with the given +name+.
- *  If the third argument is a valid OID, the reference will be created as direct.
- *  Otherwise, it will be assumed the target is the name of another reference.
- *
- *  If a reference with the given +name+ already exists and +force+ is +true+,
- *  it will be overwritten. Otherwise, an exception will be raised.
- */
-static VALUE rb_git_ref_create(int argc, VALUE *argv, VALUE klass)
-{
-	VALUE rb_repo, rb_name, rb_target, rb_force;
-	git_repository *repo;
-	git_reference *ref;
-	git_oid oid;
-	int error, force = 0;
-
-	rb_scan_args(argc, argv, "31", &rb_repo, &rb_name, &rb_target, &rb_force);
-
-	Data_Get_Struct(rb_repo, git_repository, repo);
-	Check_Type(rb_name, T_STRING);
-	Check_Type(rb_target, T_STRING);
-
-	if (!NIL_P(rb_force))
-		force = rugged_parse_bool(rb_force);
-
-	if (git_oid_fromstr(&oid, StringValueCStr(rb_target)) == GIT_OK) {
-		error = git_reference_create(
-			&ref, repo, StringValueCStr(rb_name), &oid, force);
-	} else {
-		error = git_reference_symbolic_create(
-			&ref, repo, StringValueCStr(rb_name), StringValueCStr(rb_target), force);
-	}
-
-	rugged_exception_check(error);
-	return rugged_ref_new(klass, rb_repo, ref);
-}
-
-/*
- *  call-seq:
  *    reference.target -> oid
  *    reference.target -> ref_name
  *
@@ -634,7 +593,6 @@ void Init_rugged_reference(void)
 	rb_define_singleton_method(rb_cRuggedReference, "lookup", rb_git_ref_lookup, 2);
 	rb_define_singleton_method(rb_cRuggedReference, "exist?", rb_git_ref_exist, 2);
 	rb_define_singleton_method(rb_cRuggedReference, "exists?", rb_git_ref_exist, 2);
-	rb_define_singleton_method(rb_cRuggedReference, "create", rb_git_ref_create, -1);
 	rb_define_singleton_method(rb_cRuggedReference, "each", rb_git_ref_each, -1);
 	rb_define_singleton_method(rb_cRuggedReference, "each_name", rb_git_ref_each_name, -1);
 	rb_define_singleton_method(rb_cRuggedReference, "valid_name?", rb_git_ref_valid_name, 1);

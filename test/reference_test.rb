@@ -109,7 +109,7 @@ class ReferenceWriteTest < Rugged::TestCase
   include Rugged::TempRepositoryAccess
 
   def test_list_unicode_refs
-    Rugged::Reference.create(@repo,
+    @repo.references.add(
       "refs/heads/#{ReferenceTest::UNICODE_REF_NAME}",
       "refs/heads/master")
 
@@ -118,7 +118,7 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_create_symbolic_ref
-    ref = Rugged::Reference.create(@repo, "refs/heads/unit_test", "refs/heads/master")
+    ref = @repo.references.add("refs/heads/unit_test", "refs/heads/master")
     assert_equal "refs/heads/master", ref.target
     assert_equal :symbolic, ref.type
     assert_equal "refs/heads/unit_test", ref.name
@@ -126,7 +126,7 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_create_ref_from_oid
-    ref = Rugged::Reference.create(@repo,
+    ref = @repo.references.add(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
@@ -137,7 +137,7 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_rename_ref
-    ref = Rugged::Reference.create(@repo,
+    ref = @repo.references.add(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
@@ -151,7 +151,7 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_set_ref_target
-    ref = Rugged::Reference.create(@repo,
+    ref = @repo.references.add(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
@@ -165,8 +165,8 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_write_and_read_unicode_refs
-    ref1 = Rugged::Reference.create(@repo, "refs/heads/Ångström", "refs/heads/master")
-    ref2 = Rugged::Reference.create(@repo, "refs/heads/foobar", "refs/heads/Ångström")
+    ref1 = @repo.references.add("refs/heads/Ångström", "refs/heads/master")
+    ref2 = @repo.references.add("refs/heads/foobar", "refs/heads/Ångström")
 
     assert_equal "refs/heads/Ångström", ref1.name
     assert_equal "refs/heads/Ångström", ref2.target
@@ -178,7 +178,7 @@ class ReflogTest < Rugged::TestCase
 
   def setup
     super
-    @ref = Rugged::Reference.create(@repo,
+    @ref = @repo.references.add(
       "refs/heads/test-reflog",
       "36060c58702ed4c2a40832c51758d5344201d89a")
   end
