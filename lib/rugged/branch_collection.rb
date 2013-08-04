@@ -1,24 +1,7 @@
 module Rugged
   class BranchCollection
-    # def initialize(repo)
-    #   @repo = repo
-    # end
-
-    # def [](name)
-    #   if name == "HEAD" || name.start_with?("refs/heads/") || name.start_with?("refs/remotes/")
-
-    #   end
-
-    #   # "refs/heads/#{name}"
-    #   # "refs/remotes/#{name}"
-    #   # "refs/#{name}"
-
-    #   # name = "refs/tags/#{name}" unless name.start_with?("refs/tags/")
-    #   # Tag.new(@repo, @repo.references[name])
-    # end
-
     def add(name, target, force = false)
-      Branch.create(@repo, name, target, force)
+      Branch.create(@owner, name, target, force)
     end
 
     def rename(ref, new_name, force = false)

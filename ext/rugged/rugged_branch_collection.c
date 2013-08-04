@@ -95,7 +95,7 @@ static VALUE each_branch(int argc, VALUE *argv, VALUE self, int branch_names_onl
 
 	if (!rb_block_given_p()) {
 		VALUE symbol = branch_names_only ? CSTR2SYM("each_name") : CSTR2SYM("each");
-		return rb_funcall(self, rb_intern("to_enum"), 3, symbol, rb_repo, rb_filter);
+		return rb_funcall(self, rb_intern("to_enum"), 2, symbol, rb_filter);
 	}
 
 	rugged_check_repo(rb_repo);
@@ -173,7 +173,7 @@ void Init_rugged_branch_collection(void)
 	rb_define_method(rb_cRuggedBranchCollection, "[]", rb_git_branch_collection_aref, 1);
 	rb_define_method(rb_cRuggedBranchCollection, "each", rb_git_branch_collection_each, -1);
 	rb_define_method(rb_cRuggedBranchCollection, "each_name", rb_git_branch_collection_each_name, -1);
-	// rb_define_method(rb_cRuggedBranchCollection, "add", rb_git_branch_collection_add, -1);
+	//rb_define_method(rb_cRuggedBranchCollection, "add", rb_git_branch_collection_add, -1);
 	// rb_define_method(rb_cRuggedBranchCollection, "rename", rb_git_branch_collection_rename, -1);
 	// rb_define_method(rb_cRuggedBranchCollection, "update", rb_git_branch_collection_update, 2);
 	// rb_define_method(rb_cRuggedBranchCollection, "delete", rb_git_branch_collection_delete, 1);

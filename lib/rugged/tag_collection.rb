@@ -15,8 +15,8 @@ module Rugged
       Tag.each(@repo, &block)
     end
     
-    def add(name, target, tagger = nil, message = nil, force = false)
-      Reference.create(@repo, target: target, tagger: tagger, message: message, force: force)
+    def add(name, target, options = {})
+      Reference.create(@repo, target: target, tagger: options[:tagger], message: options[:message], force: options[:force])
     end
 
     def delete(tag)

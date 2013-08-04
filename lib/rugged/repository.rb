@@ -108,14 +108,11 @@ module Rugged
     end
 
     def branches
-      @branches ||= Rugged::BranchCollection.new(self)
+      @branches ||= BranchCollection.new(self)
     end
 
-    # All the tags in the repository.
-    #
-    # Returns an Enumerable::Enumerator containing all the String tag names.
-    def tags(pattern="")
-      Rugged::Tag.each(self, pattern)
+    def tags
+      @tags ||= TagCollection.new(self)
     end
 
     # All the remotes in the repository.
