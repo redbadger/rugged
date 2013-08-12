@@ -27,18 +27,22 @@
 extern VALUE rb_mRugged;
 extern VALUE rb_cRuggedObject;
 extern VALUE rb_cRuggedRepo;
+extern VALUE rb_cRuggedReference;
+
 VALUE rb_cRuggedTag;
+VALUE rb_cRuggedTagAnnotation;
+VALUE rb_cRuggedTagCollection;
 
 /*
  *  call-seq:
- *    tag.target -> object
+ *    annotation.target -> object
  *
- *  Return the +object+ pointed at by this tag, as a <tt>Rugged::Object</tt>
+ *  Return the +object+ pointed at by this tag annotation, as a <tt>Rugged::Object</tt>
  *  instance.
  *
- *    tag.target #=> #<Rugged::Commit:0x108828918>
+ *    annotation.target #=> #<Rugged::Commit:0x108828918>
  */
-static VALUE rb_git_tag_target_GET(VALUE self)
+static VALUE rb_git_tag_annotation_target(VALUE self)
 {
 	git_tag *tag;
 	git_object *target;
@@ -56,15 +60,15 @@ static VALUE rb_git_tag_target_GET(VALUE self)
 
 /*
  *  call-seq:
- *    tag.target_oid -> oid
- *    tag.target_id -> oid
+ *    annotation.target_oid -> oid
+ *    annotation.target_id -> oid
  *
- *  Return the oid pointed at by this tag, as a <tt>String</tt>
+ *  Return the oid pointed at by this tag annotation, as a <tt>String</tt>
  *  instance.
  *
- *    tag.target_id #=> "2cb831a8aea28b2c1b9c63385585b864e4d3bad1"
+ *    annotation.target_id #=> "2cb831a8aea28b2c1b9c63385585b864e4d3bad1"
  */
-static VALUE rb_git_tag_target_id_GET(VALUE self)
+static VALUE rb_git_tag_annotation_target_id(VALUE self)
 {
 	git_tag *tag;
 	const git_oid *target_oid;
@@ -78,17 +82,17 @@ static VALUE rb_git_tag_target_id_GET(VALUE self)
 
 /*
  *  call-seq:
- *    tag.type -> t
+ *    annotation.type -> t
  *
  *  Return a symbol representing the type of the objeced pointed at by
  *  this +tag+. Possible values are +:blob+, +:commit+, +:tree+ and +:tag+.
  *
  *  This is always the same as the +type+ of the returned <tt>tag.target</tt>
  *
- *    tag.type #=> :commit
- *    tag.target.type == tag.type #=> true
+ *    annotation.type #=> :commit
+ *    annotation.target.type == tag.type #=> true
  */
-static VALUE rb_git_tag_target_type_GET(VALUE self)
+static VALUE rb_git_tag_annotation_target_type(VALUE self)
 {
 	git_tag *tag;
 	Data_Get_Struct(self, git_tag, tag);
@@ -98,13 +102,13 @@ static VALUE rb_git_tag_target_type_GET(VALUE self)
 
 /*
  *  call-seq:
- *    tag.name -> name
+ *    annotation.name -> name
  *
  *  Return a string with the name of this +tag+.
  *
- *    tag.name #=> "v0.16.0"
+ *    annotation.name #=> "v0.16.0"
  */
-static VALUE rb_git_tag_name_GET(VALUE self)
+static VALUE rb_git_tag_annotation_name(VALUE self)
 {
 	git_tag *tag;
 	Data_Get_Struct(self, git_tag, tag);
@@ -114,15 +118,15 @@ static VALUE rb_git_tag_name_GET(VALUE self)
 
 /*
  *  call-seq:
- *    tag.tagger -> signature
+ *    annotation.tagger -> signature
  *
  *  Return the signature for the author of this +tag+. The signature
  *  is returned as a +Hash+ containing +:name+, +:email+ of the author
  *  and +:time+ of the tagging.
  *
- *    tag.tagger #=> {:email=>"tanoku@gmail.com", :time=>Tue Jan 24 05:42:45 UTC 2012, :name=>"Vicent Mart\303\255"}
+ *    annotation.tagger #=> {:email=>"tanoku@gmail.com", :time=>Tue Jan 24 05:42:45 UTC 2012, :name=>"Vicent Mart\303\255"}
  */
-static VALUE rb_git_tag_tagger_GET(VALUE self)
+static VALUE rb_git_tag_annotation_tagger(VALUE self)
 {
 	git_tag *tag;
 	const git_signature *tagger;
@@ -138,14 +142,14 @@ static VALUE rb_git_tag_tagger_GET(VALUE self)
 
 /*
  *  call-seq:
- *    tag.message -> msg
+ *    annotation.message -> msg
  *
  *  Return the message of this +tag+. This includes the full body of the
  *  message and any optional footers or signatures after it.
  *
- *    tag.message #=> "Release v0.16.0, codename 'broken stuff'"
+ *    annotation.message #=> "Release v0.16.0, codename 'broken stuff'"
  */
-static VALUE rb_git_tag_message_GET(VALUE self)
+static VALUE rb_git_tag_annotation_message(VALUE self)
 {
 	git_tag *tag;
 	const char *message;
@@ -159,9 +163,15 @@ static VALUE rb_git_tag_message_GET(VALUE self)
 	return rb_str_new_utf8(message);
 }
 
+static VALUE rb_git_tag_collection_initialize(VALUE self, VALUE repo) {
+	rugged_set_owner(self, repo);
+	return self;
+}
+
 /*
  *  call-seq:
- *    Tag.create(repo, data) -> oid
+ *    tags.add(name, annotation = nil) -> oid
+ *    tags.add(name, force = false, annotation = nil) -> oid
  *
  *  Create a new tag in +repo+.
  *
@@ -188,73 +198,54 @@ static VALUE rb_git_tag_message_GET(VALUE self)
  *
  *  Returns the OID of the newly created tag.
  */
-static VALUE rb_git_tag_create(VALUE self, VALUE rb_repo, VALUE rb_data)
+static VALUE rb_git_tag_collection_create(int argc, VALUE *argv, VALUE self)
 {
 	git_oid tag_oid;
-	git_repository *repo = NULL;
+	git_repository *repo = NULL;	
+	git_object *target = NULL;
 	int error, force = 0;
 
-	VALUE rb_name, rb_target, rb_tagger, rb_message, rb_force;
+	VALUE rb_name, rb_target, rb_force, rb_annotation;
+	VALUE rb_repo = rugged_owner(self);
 
-	rugged_check_repo(rb_repo);
 	Data_Get_Struct(rb_repo, git_repository, repo);
 
-	if (TYPE(rb_data) == T_STRING) {
-		error = git_tag_create_frombuffer(
+	rb_scan_args(argc, argv, "21:", &rb_name, &rb_target, &rb_force, &rb_annotation);
+	Check_Type(rb_name, T_STRING);
+
+	if (!NIL_P(rb_force))
+		force = rugged_parse_bool(rb_force);
+
+	target = rugged_object_get(repo, rb_target, GIT_OBJ_ANY);
+
+	if (NIL_P(rb_annotation)) {
+		error = git_tag_create_lightweight(
 			&tag_oid,
 			repo,
-			StringValueCStr(rb_data),
+			StringValueCStr(rb_name),
+			target,
 			force
 		);
-	} else if (TYPE(rb_data) == T_HASH) {
-		git_object *target = NULL;
-
-		rb_name = rb_hash_aref(rb_data, CSTR2SYM("name"));
-		Check_Type(rb_name, T_STRING);
-
-		rb_force = rb_hash_aref(rb_data, CSTR2SYM("force"));
-		if (!NIL_P(rb_force))
-			force = rugged_parse_bool(rb_force);
-
-		/* only for heavy tags */
-		rb_tagger = rb_hash_aref(rb_data, CSTR2SYM("tagger"));
-		rb_message = rb_hash_aref(rb_data, CSTR2SYM("message"));
-
-		if (!NIL_P(rb_message))
-			Check_Type(rb_message, T_STRING);
-
-		rb_target = rb_hash_aref(rb_data, CSTR2SYM("target"));
-		target = rugged_object_get(repo, rb_target, GIT_OBJ_ANY);
-
-		if (!NIL_P(rb_tagger) && !NIL_P(rb_message)) {
-			git_signature *tagger = NULL;
-
-			tagger = rugged_signature_get(rb_tagger);
-
-			error = git_tag_create(
-				&tag_oid,
-				repo,
-				StringValueCStr(rb_name),
-				target,
-				tagger,
-				StringValueCStr(rb_message),
-				force
-			);
-
-			git_signature_free(tagger);
-		} else {
-			error = git_tag_create_lightweight(
-				&tag_oid,
-				repo,
-				StringValueCStr(rb_name),
-				target,
-				force
-			);
-		}
-
-		git_object_free(target);
 	} else {
-		rb_raise(rb_eTypeError, "Invalid tag data: expected a String or a Hash");
+		git_signature *tagger = rugged_signature_get(
+			rb_hash_aref(rb_annotation, CSTR2SYM("tagger"))
+		);
+		VALUE rb_message = rb_hash_aref(rb_annotation, CSTR2SYM("message"));
+
+		Check_Type(rb_message, T_STRING);
+
+		error = git_tag_create(
+			&tag_oid,
+			repo,
+			StringValueCStr(rb_name),
+			target,
+			tagger,
+			StringValueCStr(rb_message),
+			force
+		);
+
+		git_signature_free(tagger);
+		git_object_free(target);
 	}
 
 	rugged_exception_check(error);
@@ -263,38 +254,71 @@ static VALUE rb_git_tag_create(VALUE self, VALUE rb_repo, VALUE rb_data)
 
 /*
  *  call-seq:
- *    Tag.each(repo[, pattern]) { |name| block } -> nil
- *    Tag.each(repo[, pattern])                  -> enumerator
+ *    tags[name] -> tag
  *
- *  Iterate through all the tag names in +repo+. Iteration
- *  can be optionally filtered to the ones matching the given
+ *  Lookup a tag in +repository+, with the given +name+.
+ *
+ *  +name+ can be a short or canonical tag name
+ *  (e.g. +v0.1.0+ or +/refs/tags/v0.1.0+).
+ *
+ *  Returns the looked up tag, or +nil+ if the tag doesn't exist.
+ */
+static VALUE rb_git_tag_collection_aref(VALUE self, VALUE rb_name)
+{
+	VALUE rb_repo = rugged_owner(self);
+	git_reference *tag;
+	git_repository *repo;
+	int error;
+
+	Data_Get_Struct(rb_repo, git_repository, repo);
+
+	Check_Type(rb_name, T_STRING);
+
+	if (!RTEST(rb_funcall(rb_name, rb_intern("start_with?"), 1, rb_str_new2("refs/tags/")))) {
+		rb_funcall(rb_name, rb_intern("prepend"), 1, rb_str_new2("refs/tags/"));
+	}
+
+	error = git_reference_lookup(&tag, repo, StringValueCStr(rb_name));
+	if (error == GIT_ENOTFOUND)
+		return Qnil;
+	rugged_exception_check(error);
+
+	return rugged_ref_new(rb_cRuggedTag, rb_repo, tag);
+}
+
+/*
+ *  call-seq:
+ *    tags.each([pattern]) { |tag| block } -> nil
+ *    tags.each([pattern])                  -> enumerator
+ *
+ *  Iterate through all the tags in +repo+. Iteration
+ *  can be optionally filtered to tags matching the given
  *  +pattern+, a standard Unix filename glob.
  *
  *  If +pattern+ is empty or not given, all tag names will be returned.
  *
- *  The given block will be called once with the name for each tag.
+ *  The given block will be called once with each tag.
  *
  *  If no block is given, an enumerator will be returned.
  */
-static VALUE rb_git_tag_each(int argc, VALUE *argv, VALUE self)
+static VALUE rb_git_tag_collection_each(int argc, VALUE *argv, VALUE self)
 {
 	git_repository *repo;
 	git_strarray tags;
 	size_t i;
 	int error, exception = 0;
-	VALUE rb_repo, rb_pattern;
+	VALUE rb_repo = rugged_owner(self), rb_pattern;
 	const char *pattern = NULL;
 
-	rb_scan_args(argc, argv, "11", &rb_repo, &rb_pattern);
+	rb_scan_args(argc, argv, "01", &rb_pattern);
 
 	if (!rb_block_given_p())
-		return rb_funcall(self, rb_intern("to_enum"), 3, CSTR2SYM("each"), rb_repo, rb_pattern);
+		return rb_funcall(self, rb_intern("to_enum"), 2, CSTR2SYM("each"), rb_pattern);
 
 	if (!NIL_P(rb_pattern)) {
 		Check_Type(rb_pattern, T_STRING);
 		pattern = StringValueCStr(rb_pattern);
 	}
-
 
 	rugged_check_repo(rb_repo);
 	Data_Get_Struct(rb_repo, git_repository, repo);
@@ -303,7 +327,7 @@ static VALUE rb_git_tag_each(int argc, VALUE *argv, VALUE self)
 	rugged_exception_check(error);
 
 	for (i = 0; !exception && i < tags.count; ++i)
-		rb_protect(rb_yield, rb_str_new_utf8(tags.strings[i]), &exception);
+		rb_protect(rb_yield, rb_git_tag_collection_aref(self, rb_str_new_utf8(tags.strings[i])), &exception);
 
 	git_strarray_free(&tags);
 
@@ -315,38 +339,121 @@ static VALUE rb_git_tag_each(int argc, VALUE *argv, VALUE self)
 
 /*
  *  call-seq:
- *    Tag.delete(repo, name) -> nil
+ *    tags.delete(tag) -> nil
+ *    tags.delete(name) -> nil
  *
- *  Delete the tag reference identified by +name+ from +repo+.
+ *  Delete the given +tag+ reference or the tag reference identified by
+ *  +name+ from +repo+.
  */
-static VALUE rb_git_tag_delete(VALUE self, VALUE rb_repo, VALUE rb_name)
+static VALUE rb_git_tag_collection_delete(VALUE self, VALUE rb_name_or_tag)
 {
+	VALUE rb_repo = rugged_owner(self);
 	git_repository *repo;
 	int error;
 
 	rugged_check_repo(rb_repo);
 	Data_Get_Struct(rb_repo, git_repository, repo);
 
-	Check_Type(rb_name, T_STRING);
+	if (rb_obj_is_kind_of(rb_name_or_tag, rb_cRuggedTag)) {
+		rb_name_or_tag = rb_funcall(rb_name_or_tag, rb_intern("name"), 0);
+		Check_Type(rb_name_or_tag, T_STRING);
+	} else if (TYPE(rb_name_or_tag) == T_STRING) {
+		if (rb_funcall(rb_name_or_tag, rb_intern("start_with?"), 1, rb_str_new2("refs/tags/")) == Qtrue) {
+			rb_funcall(rb_name_or_tag, rb_intern("sub!"), 2, rb_str_new2("refs/tags/"), rb_str_new2(""));
+		}
+	} else {
+		rb_raise(rb_eTypeError, "Expecting a String or Rugged::Tag instance");
+	}
 
-	error = git_tag_delete(repo, StringValueCStr(rb_name));
+	error = git_tag_delete(repo, StringValueCStr(rb_name_or_tag));
 	rugged_exception_check(error);
 	return Qnil;
 }
 
+/*
+ *  call-seq:
+ *    TagAnnotation.create(repo, data) -> oid
+ *
+ *  Create a new tag annotation object in +repo+'s object database,
+ *  and return it's OID.
+ *
+ *  No reference to the tag annotation object will be created.
+ *
+ *  +data+ has to contain the following key-value pairs:
+ *
+ *  :name ::
+ *    A String holding the tag's new name.
+ *
+ *  :tagger ::
+ *    A Hash containing a git signature.
+ *
+ *  :message ::
+ *    A String containing the message for the new tag.
+ *
+ *  :target ::
+ *    The OID of the object that the new tag should point to.
+ */
+static VALUE rb_git_tag_annotation_create(VALUE self, VALUE rb_repo, VALUE rb_data)
+{
+	VALUE rb_message = rb_hash_aref(rb_data, CSTR2SYM("message"));
+	VALUE rb_name = rb_hash_aref(rb_data, CSTR2SYM("name"));
+	VALUE rb_target = rb_hash_aref(rb_data, CSTR2SYM("target"));
+
+	git_object *target;
+	git_signature *tagger;
+	git_repository *repo;
+	git_oid tag_oid;
+
+	int error;
+
+	rugged_check_repo(rb_repo);
+	Data_Get_Struct(rb_repo, git_repository, repo);
+
+	tagger = rugged_signature_get(
+		rb_hash_aref(rb_data, CSTR2SYM("tagger"))
+	);
+
+	target = rugged_object_get(repo, rb_target, GIT_OBJ_ANY);
+
+	Check_Type(rb_message, T_STRING);
+	Check_Type(rb_name, T_STRING);
+
+	error = git_tag_annotation_create(
+		&tag_oid,
+		repo,
+		StringValueCStr(rb_name),
+		target,
+		tagger,
+		StringValueCStr(rb_message)
+	);
+
+	git_signature_free(tagger);
+
+	rugged_exception_check(error);
+	return rugged_create_oid(&tag_oid);
+}
+
 void Init_rugged_tag(void)
 {
-	rb_cRuggedTag = rb_define_class_under(rb_mRugged, "Tag", rb_cRuggedObject);
+	rb_cRuggedTag           = rb_define_class_under(rb_mRugged, "Tag",           rb_cRuggedReference);
+	rb_cRuggedTagAnnotation = rb_define_class_under(rb_mRugged, "TagAnnotation", rb_cRuggedObject);
+	rb_cRuggedTagCollection = rb_define_class_under(rb_mRugged, "TagCollection", rb_cObject);
 
-	rb_define_singleton_method(rb_cRuggedTag, "create", rb_git_tag_create, 2);
-	rb_define_singleton_method(rb_cRuggedTag, "each", rb_git_tag_each, -1);
-	rb_define_singleton_method(rb_cRuggedTag, "delete", rb_git_tag_delete, 2);
+	rb_include_module(rb_cRuggedTagCollection, rb_mEnumerable);
 
-	rb_define_method(rb_cRuggedTag, "message", rb_git_tag_message_GET, 0);
-	rb_define_method(rb_cRuggedTag, "name", rb_git_tag_name_GET, 0);
-	rb_define_method(rb_cRuggedTag, "target", rb_git_tag_target_GET, 0);
-	rb_define_method(rb_cRuggedTag, "target_oid", rb_git_tag_target_id_GET, 0);
-	rb_define_method(rb_cRuggedTag, "target_id", rb_git_tag_target_id_GET, 0);
-	rb_define_method(rb_cRuggedTag, "target_type", rb_git_tag_target_type_GET, 0);
-	rb_define_method(rb_cRuggedTag, "tagger", rb_git_tag_tagger_GET, 0);
+	rb_define_method(rb_cRuggedTagCollection, "initialize", rb_git_tag_collection_initialize, 1);
+	rb_define_method(rb_cRuggedTagCollection, "create",     rb_git_tag_collection_create, -1);
+	rb_define_method(rb_cRuggedTagCollection, "[]",         rb_git_tag_collection_aref, 1);
+	rb_define_method(rb_cRuggedTagCollection, "each",       rb_git_tag_collection_each, -1);
+	rb_define_method(rb_cRuggedTagCollection, "delete",     rb_git_tag_collection_delete, 1);
+
+	rb_define_singleton_method(rb_cRuggedTagAnnotation, "create", rb_git_tag_annotation_create, 2);
+
+	rb_define_method(rb_cRuggedTagAnnotation, "message",     rb_git_tag_annotation_message, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "name",        rb_git_tag_annotation_name, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "target",      rb_git_tag_annotation_target, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "target_oid",  rb_git_tag_annotation_target_id, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "target_id",   rb_git_tag_annotation_target_id, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "target_type", rb_git_tag_annotation_target_type, 0);
+	rb_define_method(rb_cRuggedTagAnnotation, "tagger",      rb_git_tag_annotation_tagger, 0);
 }

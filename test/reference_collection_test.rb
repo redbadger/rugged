@@ -41,10 +41,10 @@ class ReferenceCollectionTest < Rugged::SandboxedTestCase
     ], names.sort
   end
 
-  def test_glob
+  def test_each_with_pattern
     names = []
 
-    @repo.references.glob("refs/remotes/*") do |ref|
+    @repo.references.each("refs/remotes/*") do |ref|
       names << ref.name
     end
 

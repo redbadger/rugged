@@ -104,8 +104,7 @@ class RepositoryTest < Rugged::SandboxedTestCase
   end
 
   def test_return_matching_tags
-    tags = @repo.tags 'v0.9'
-    assert_equal 1, tags.count
+    assert_equal 1, @repo.tags.each('v0.9').count
   end
 
   def test_return_all_remotes
@@ -399,7 +398,7 @@ class RepositoryPushTest < Rugged::SandboxedTestCase
     @remote_repo.config['core.bare'] = 'true'
 
     @repo = sandbox_clone("testrepo.git", "testrepo")
-    @repo.references.add("refs/heads/unit_test",
+    @repo.references.create("refs/heads/unit_test",
       "8496071c1b46c854b31185ea97743be6a8774479")
   end
 

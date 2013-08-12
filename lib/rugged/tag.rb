@@ -1,26 +1,25 @@
 module Rugged
-  class Tag
+  class Tag < Reference
+    def name
+      self.canonical_name.sub("refs/tags/", "")
+    end
 
-    def self.prettify_message(msg, strip_comments = true)
-      Rugged::prettify_message(msg, strip_comments)
+    def annotated?
+      @owner.lookup(self.target).is_a?(TagAnnotation)
+    end
+
+    def annotation
+      target = @owner.lookup(self.target)
+      target.is_a?(TagAnnotation) ? target : nil
+    end
+
+    def target_object
+      target = @owner.lookup(self.target)
+      target.is_a?(TagAnnotation) ? target.target : target
     end
 
     def inspect
-      "#<Rugged::Tag:#{object_id} {name: #{name.inspect}, message: #{message.inspect}, target: #{target.inspect}>"
-    end
-
-    def to_hash
-      {
-        :message => message,
-        :name => name,
-        :target => target,
-        :tagger => tagger,
-      }
-    end
-
-    def modify(new_args, force=True)
-      args = self.to_hash.merge(new_args)
-      Tag.create(args, force)
+      "#<Rugged::Tag:#{object_id} {name: #{name.inspect}, target: #{target_object.inspect}, annotation:#{annotation.inspect} }>"
     end
   end
 end

@@ -10,16 +10,17 @@ class ReferenceTest < Rugged::TestCase
     valid = "refs/foobar"
     invalid = "refs/~nope^*"
 
-    assert Rugged::Reference.valid_name?(valid)
-    assert !Rugged::Reference.valid_name?(invalid)
+    assert @repo.references.valid_name?(valid)
+    refute @repo.references.valid_name?(invalid)
   end
 
   def test_each_can_handle_exceptions
-    assert_raises Exception do
-      Rugged::Reference.each(@repo) do
+    exc = assert_raises Exception do
+      @repo.references.each do |ref|
         raise Exception.new("fail")
       end
     end
+    assert_equal exc.message, "fail"
   end
 
   def test_list_references
@@ -73,10 +74,10 @@ class ReferenceTest < Rugged::TestCase
   end
 
   def test_reference_exists
-    exists = Rugged::Reference.exist?(@repo, "refs/heads/master")
+    exists = @repo.references.exists?("refs/heads/master")
     assert exists
 
-    exists = Rugged::Reference.exist?(@repo, "lol/wut")
+    exists = @repo.references.exists?("lol/wut")
     assert !exists
   end
 
@@ -109,7 +110,7 @@ class ReferenceWriteTest < Rugged::TestCase
   include Rugged::TempRepositoryAccess
 
   def test_list_unicode_refs
-    @repo.references.add(
+    @repo.references.create(
       "refs/heads/#{ReferenceTest::UNICODE_REF_NAME}",
       "refs/heads/master")
 
@@ -118,26 +119,24 @@ class ReferenceWriteTest < Rugged::TestCase
   end
 
   def test_create_symbolic_ref
-    ref = @repo.references.add("refs/heads/unit_test", "refs/heads/master")
+    ref = @repo.references.create("refs/heads/unit_test", "refs/heads/master")
     assert_equal "refs/heads/master", ref.target
     assert_equal :symbolic, ref.type
     assert_equal "refs/heads/unit_test", ref.name
-    ref.delete!
   end
 
   def test_create_ref_from_oid
-    ref = @repo.references.add(
+    ref = @repo.references.create(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
     assert_equal "36060c58702ed4c2a40832c51758d5344201d89a", ref.target
     assert_equal :direct, ref.type
     assert_equal "refs/heads/unit_test", ref.name
-    ref.delete!
   end
 
-  def test_rename_ref
-    ref = @repo.references.add(
+  def test_rename_with_ref
+    ref = @repo.references.create(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
@@ -145,13 +144,12 @@ class ReferenceWriteTest < Rugged::TestCase
     assert_equal :direct, ref.type
     assert_equal "refs/heads/unit_test", ref.name
 
-    new_ref = ref.rename "refs/heads/rug_new_name"
+    new_ref = @repo.references.rename(ref, "refs/heads/rug_new_name")
     assert_equal "refs/heads/rug_new_name", new_ref.name
-    new_ref.delete!
   end
 
-  def test_set_ref_target
-    ref = @repo.references.add(
+  def test_rename_with_name
+    ref = @repo.references.create(
       "refs/heads/unit_test",
       "36060c58702ed4c2a40832c51758d5344201d89a")
 
@@ -159,17 +157,59 @@ class ReferenceWriteTest < Rugged::TestCase
     assert_equal :direct, ref.type
     assert_equal "refs/heads/unit_test", ref.name
 
-    new_ref = ref.set_target "5b5b025afb0b4c913b4c338a42934a3863bf3644"
+    new_ref = @repo.references.rename("refs/heads/unit_test", "refs/heads/rug_new_name")
+    assert_equal "refs/heads/rug_new_name", new_ref.name
+  end
+
+  def test_update_with_ref
+    ref = @repo.references.create(
+      "refs/heads/unit_test",
+      "36060c58702ed4c2a40832c51758d5344201d89a")
+
+    new_ref = @repo.references.update(ref, "5b5b025afb0b4c913b4c338a42934a3863bf3644")
     assert_equal "5b5b025afb0b4c913b4c338a42934a3863bf3644", new_ref.target
-    new_ref.delete!
+  end
+
+  def test_update_with_name
+    @repo.references.create(
+      "refs/heads/unit_test",
+      "36060c58702ed4c2a40832c51758d5344201d89a")
+
+    new_ref = @repo.references.update("refs/heads/unit_test", "5b5b025afb0b4c913b4c338a42934a3863bf3644")
+    assert_equal "5b5b025afb0b4c913b4c338a42934a3863bf3644", new_ref.target
+  end
+
+  def test_update_with_target_ref
+    ref = @repo.references.create("refs/heads/unit_test", "refs/heads/master")
+
+    new_ref = @repo.references.update(ref, @repo.references["refs/tags/v1.0"])
+    assert_equal "refs/tags/v1.0", new_ref.target
   end
 
   def test_write_and_read_unicode_refs
-    ref1 = @repo.references.add("refs/heads/Ångström", "refs/heads/master")
-    ref2 = @repo.references.add("refs/heads/foobar", "refs/heads/Ångström")
+    ref1 = @repo.references.create("refs/heads/Ångström", "refs/heads/master")
+    ref2 = @repo.references.create("refs/heads/foobar", "refs/heads/Ångström")
 
     assert_equal "refs/heads/Ångström", ref1.name
     assert_equal "refs/heads/Ångström", ref2.target
+  end
+
+  def test_delete_with_name
+    @repo.references.create(
+      "refs/heads/unit_test",
+      "36060c58702ed4c2a40832c51758d5344201d89a")
+    @repo.references.delete("refs/heads/unit_test")
+
+    refute @repo.references["refs/heads/unit_test"]
+  end
+
+  def test_delete_with_ref
+    ref = @repo.references.create(
+      "refs/heads/unit_test",
+      "36060c58702ed4c2a40832c51758d5344201d89a")
+    @repo.references.delete(ref)
+
+    refute @repo.references["refs/heads/unit_test"]
   end
 end
 
@@ -178,7 +218,7 @@ class ReflogTest < Rugged::TestCase
 
   def setup
     super
-    @ref = @repo.references.add(
+    @ref = @repo.references.create(
       "refs/heads/test-reflog",
       "36060c58702ed4c2a40832c51758d5344201d89a")
   end

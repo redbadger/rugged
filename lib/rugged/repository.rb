@@ -92,15 +92,15 @@ module Rugged
     #
     # Returns a Rugged::Reference.
     def ref(ref_name)
-      Rugged::Reference.lookup(self, ref_name)
+      references[ref_name]
     end
 
     def refs(glob = nil)
-      Rugged::Reference.each(self, glob)
+      references.each(glob)
     end
 
     def ref_names(glob = nil)
-      Rugged::Reference.each_name(self, glob)
+      references.each_name(glob)
     end
 
     def references
@@ -138,7 +138,7 @@ module Rugged
         target = rev_parse_oid(sha_or_ref)
       end
 
-      Branch.create(self, name, target)
+      branches.create(name, target)
     end
 
     # Get the blob at a path for a specific revision.

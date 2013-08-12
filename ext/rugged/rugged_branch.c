@@ -54,52 +54,6 @@ static int parse_branch_type(VALUE rb_filter)
 
 /*
  *  call-seq:
- *    Branch.create(repository, name, target, force = false) -> branch
- *
- *  Create a new branch in +repository+, with the given +name+, and pointing
- *  to the +target+.
- *
- *  +name+ needs to be a branch name, not an absolute reference path
- *  (e.g. +development+ instead of +refs/heads/development+).
- *
- *  +target+ needs to be an existing commit in the given +repository+.
- *
- *  If +force+ is +true+, any existing branches will be overwritten.
- *
- *  Returns a Rugged::Branch object with the newly created branch.
- */
-static VALUE rb_git_branch_create(int argc, VALUE *argv, VALUE self)
-{
-	git_reference *branch;
-	git_commit *target = NULL;
-	git_repository *repo = NULL;
-	int error, force = 0;
-
-	VALUE rb_repo, rb_name, rb_target, rb_force;
-
-	rb_scan_args(argc, argv, "31", &rb_repo, &rb_name, &rb_target, &rb_force);
-
-	rugged_check_repo(rb_repo);
-	Data_Get_Struct(rb_repo, git_repository, repo);
-
-	Check_Type(rb_name, T_STRING);
-
-	target = (git_commit *)rugged_object_get(repo, rb_target, GIT_OBJ_COMMIT);
-
-	if (!NIL_P(rb_force)) {
-		force = rugged_parse_bool(rb_force);
-	}
-
-	error = git_branch_create(&branch, repo, StringValueCStr(rb_name), target, force);
-	git_commit_free(target);
-
-	rugged_exception_check(error);
-
-	return rugged_branch_new(rb_repo, branch);
-}
-
-/*
- *  call-seq:
  *    Branch.lookup(repository, name, branch_type = :local) -> branch
  *
  *  Lookup a branch in +repository+, with the given +name+.
@@ -137,61 +91,6 @@ static VALUE rb_git_branch_lookup(int argc, VALUE *argv, VALUE self)
 
 	rugged_exception_check(error);
 	return rugged_branch_new(rb_repo, branch);
-}
-
-/*
- *  call-seq:
- *    branch.delete! -> nil
- *
- *  Remove a branch from the repository. The branch object will become invalidated
- *  and won't be able to be used for any other operations.
- */
-static VALUE rb_git_branch_delete(VALUE self)
-{
-	git_reference *branch = NULL;
-
-	Data_Get_Struct(self, git_reference, branch);
-
-	rugged_exception_check(
-		git_branch_delete(branch)
-	);
-
-	return Qnil;
-}
-
-/*
- *  call-seq:
- *    branch.move(new_name, force = false) -> new_branch
- *    branch.rename(new_name, force = false) -> new_branch
- *
- *  Rename a branch to +new_name+.
- *
- *  +new_name+ needs to be a branch name, not an absolute reference path
- *  (e.g. +development+ instead of +refs/heads/development+).
- *
- *  If +force+ is +true+, the branch will be renamed even if a branch
- *  with +new_name+ already exists.
- *
- *  A new Rugged::Branch object for the renamed branch will be returned.
- */
-static VALUE rb_git_branch_move(int argc, VALUE *argv, VALUE self)
-{
-	VALUE rb_new_branch_name, rb_force;
-	git_reference *old_branch = NULL, *new_branch = NULL;
-	int error, force = 0;
-
-	rb_scan_args(argc, argv, "11", &rb_new_branch_name, &rb_force);
-
-	Data_Get_Struct(self, git_reference, old_branch);
-	Check_Type(rb_new_branch_name, T_STRING);
-
-	if (!NIL_P(rb_force))
-		force = rugged_parse_bool(rb_force);
-
-	error = git_branch_move(&new_branch, old_branch, StringValueCStr(rb_new_branch_name), force);
-	rugged_exception_check(error);
-
-	return rugged_branch_new(rugged_owner(self), new_branch);
 }
 
 /*
@@ -357,12 +256,8 @@ void Init_rugged_branch(void)
 {
 	rb_cRuggedBranch = rb_define_class_under(rb_mRugged, "Branch", rb_cRuggedReference);
 
-	rb_define_singleton_method(rb_cRuggedBranch, "create", rb_git_branch_create, -1);
 	rb_define_singleton_method(rb_cRuggedBranch, "lookup", rb_git_branch_lookup, -1);
 
-	rb_define_method(rb_cRuggedBranch, "delete!", rb_git_branch_delete, 0);
-	rb_define_method(rb_cRuggedBranch, "rename", rb_git_branch_move, -1);
-	rb_define_method(rb_cRuggedBranch, "move", rb_git_branch_move, -1);
 	rb_define_method(rb_cRuggedBranch, "head?", rb_git_branch_head_p, 0);
 	rb_define_method(rb_cRuggedBranch, "name", rb_git_branch_name, 0);
 	rb_define_method(rb_cRuggedBranch, "remote_name", rb_git_branch_remote_name, 0);

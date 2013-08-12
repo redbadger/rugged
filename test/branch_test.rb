@@ -51,7 +51,7 @@ class BranchTest < Rugged::TestCase
   end
 
   def test_lookup_unicode_branch_name
-    new_branch = @repo.branches.add("Ångström", "5b5b025afb0b4c913b4c338a42934a3863bf3644")
+    new_branch = @repo.branches.create("Ångström", "5b5b025afb0b4c913b4c338a42934a3863bf3644")
     refute_nil new_branch
 
     retrieved_branch = @repo.branches["Ångström"]
@@ -76,7 +76,7 @@ class BranchTest < Rugged::TestCase
   def test_rename_branch
     branch = @repo.create_branch("test_branch")
 
-    branch.move('other_branch')
+    @repo.branches.rename(branch, "other_branch")
 
     assert_nil @repo.branches["test_branch"]
     refute_nil @repo.branches["other_branch"]

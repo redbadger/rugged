@@ -387,7 +387,6 @@ void Init_rugged(void)
 	Init_rugged_object();
 	Init_rugged_commit();
 	Init_rugged_tree();
-	Init_rugged_tag();
 	Init_rugged_blob();
 
 	Init_rugged_index();
@@ -406,6 +405,7 @@ void Init_rugged(void)
 	Init_rugged_diff_delta();
 	Init_rugged_diff_hunk();
 	Init_rugged_diff_line();
+	Init_rugged_tag();
 
 	/*
 	 * Sort the repository contents in no particular ordering;

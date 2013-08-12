@@ -1,14 +1,5 @@
 module Rugged
   class BranchCollection
-    def add(name, target, force = false)
-      Branch.create(@owner, name, target, force)
-    end
-
-    def rename(ref, new_name, force = false)
-      ref = self[ref] if ref.kind_of?(String)
-      ref.rename(new_name, force)
-    end
-
     def update(ref, target)
       ref = self[ref] if ref.kind_of?(String)
 
