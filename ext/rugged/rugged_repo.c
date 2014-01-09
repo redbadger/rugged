@@ -1464,6 +1464,7 @@ static VALUE rb_git_repo_push(VALUE self, VALUE rb_remote, VALUE rb_refspecs)
 	VALUE rb_refspec, rb_exception = Qnil, rb_result = rb_hash_new();
 	git_repository *repo;
 	git_remote *remote = NULL;
+	rugged_remote *wrapper = NULL;
 	git_push *push = NULL;
 
 	int error = 0, i = 0;
@@ -1477,7 +1478,8 @@ static VALUE rb_git_repo_push(VALUE self, VALUE rb_remote, VALUE rb_refspecs)
 	Data_Get_Struct(self, git_repository, repo);
 
 	if (rb_obj_is_kind_of(rb_remote, rb_cRuggedRemote)) {
-		Data_Get_Struct(rb_remote, git_remote, remote);
+		Data_Get_Struct(rb_remote, rugged_remote, wrapper);
+		remote = wrapper->remote;
 	} else if (TYPE(rb_remote) == T_STRING) {
 		error = git_remote_load(&remote, repo, StringValueCStr(rb_remote));
 		if (error) goto cleanup;

@@ -128,6 +128,11 @@ static inline int rugged_parse_bool(VALUE boolean)
 
 extern VALUE rb_cRuggedRepo;
 
+typedef struct rugged_remote {
+	git_remote *remote;
+	int exception;
+} rugged_remote;
+
 struct rugged_cb_payload {
     VALUE rb_data;
     int exception;

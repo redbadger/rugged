@@ -28,16 +28,21 @@ extern VALUE rb_mRugged;
 extern VALUE rb_cRuggedRepo;
 VALUE rb_cRuggedRemote;
 
-static void rb_git_remote__free(git_remote *remote)
+static void rb_git_remote__free(rugged_remote *wrapper)
 {
-	git_remote_free(remote);
+	git_remote_free(wrapper->remote);
+	xfree(wrapper);
 }
 
 VALUE rugged_remote_new(VALUE klass, VALUE owner, git_remote *remote)
 {
 	VALUE rb_remote;
+	rugged_remote *wrapper = xmalloc(sizeof(rugged_remote));
 
-	rb_remote = Data_Wrap_Struct(klass, NULL, &rb_git_remote__free, remote);
+	wrapper->exception = 0;
+	wrapper->remote = remote;
+
+	rb_remote = Data_Wrap_Struct(klass, NULL, &rb_git_remote__free, wrapper);
 	rugged_set_owner(rb_remote, owner);
 	return rb_remote;
 }
@@ -157,8 +162,11 @@ static VALUE rb_git_remote_lookup(VALUE klass, VALUE rb_repo, VALUE rb_name)
  */
 static VALUE rb_git_remote_disconnect(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	git_remote_disconnect(remote);
 	return Qnil;
@@ -187,10 +195,12 @@ static VALUE rb_git_remote_disconnect(VALUE self)
 static VALUE rb_git_remote_connect(VALUE self, VALUE rb_direction)
 {
 	int error, direction = 0, exception = 0;
-	git_remote *remote;
 	ID id_direction;
-
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	Check_Type(rb_direction, T_SYMBOL);
 	id_direction = SYM2ID(rb_direction);
@@ -255,10 +265,13 @@ static VALUE rugged_rhead_new(const git_remote_head *head)
 static VALUE rb_git_remote_ls(VALUE self)
 {
 	int error, exception = 0;
-	git_remote *remote;
 	const git_remote_head **heads;
 	size_t heads_len, i;
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	if (!rb_block_given_p())
 		return rb_funcall(self, rb_intern("to_enum"), 1, CSTR2SYM("ls"));
@@ -285,9 +298,12 @@ static VALUE rb_git_remote_ls(VALUE self)
  */
 static VALUE rb_git_remote_name(VALUE self)
 {
-	git_remote *remote;
 	const char * name;
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	name = git_remote_name(remote);
 
@@ -303,8 +319,11 @@ static VALUE rb_git_remote_name(VALUE self)
  */
 static VALUE rb_git_remote_url(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	return rb_str_new_utf8(git_remote_url(remote));
 }
@@ -319,10 +338,12 @@ static VALUE rb_git_remote_url(VALUE self)
  */
 static VALUE rb_git_remote_set_url(VALUE self, VALUE rb_url)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-
+	
 	rugged_validate_remote_url(rb_url);
-	Data_Get_Struct(self, git_remote, remote);
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	rugged_exception_check(
 		git_remote_set_url(remote, StringValueCStr(rb_url))
@@ -340,10 +361,12 @@ static VALUE rb_git_remote_set_url(VALUE self, VALUE rb_url)
  */
 static VALUE rb_git_remote_push_url(VALUE self)
 {
-	git_remote *remote;
 	const char * push_url;
-
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	push_url = git_remote_pushurl(remote);
 	return push_url ? rb_str_new_utf8(push_url) : Qnil;
@@ -359,10 +382,12 @@ static VALUE rb_git_remote_push_url(VALUE self)
  */
 static VALUE rb_git_remote_set_push_url(VALUE self, VALUE rb_url)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-
+	
 	rugged_validate_remote_url(rb_url);
-	Data_Get_Struct(self, git_remote, remote);
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	rugged_exception_check(
 		git_remote_set_pushurl(remote, StringValueCStr(rb_url))
@@ -373,12 +398,14 @@ static VALUE rb_git_remote_set_push_url(VALUE self, VALUE rb_url)
 
 static VALUE rb_git_remote_refspecs(VALUE self, git_direction direction)
 {
-	git_remote *remote;
 	int error = 0;
 	git_strarray refspecs;
 	VALUE rb_refspec_array;
-
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	if (direction == GIT_DIRECTION_FETCH)
 		error = git_remote_get_fetch_refspecs(&refspecs, remote);
@@ -416,10 +443,12 @@ static VALUE rb_git_remote_push_refspecs(VALUE self)
 
 static VALUE rb_git_remote_add_refspec(VALUE self, VALUE rb_refspec, git_direction direction)
 {
-	git_remote *remote;
 	int error = 0;
-
-	Data_Get_Struct(self, git_remote, remote);
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	Check_Type(rb_refspec, T_STRING);
 
@@ -463,9 +492,11 @@ static VALUE rb_git_remote_add_push(VALUE self, VALUE rb_refspec)
  */
 static VALUE rb_git_remote_clear_refspecs(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	git_remote_clear_refspecs(remote);
 
@@ -484,8 +515,11 @@ static VALUE rb_git_remote_clear_refspecs(VALUE self)
  */
 static VALUE rb_git_remote_connected(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	return git_remote_connected(remote) ? Qtrue : Qfalse;
 }
@@ -506,9 +540,11 @@ static VALUE rb_git_remote_connected(VALUE self)
 static VALUE rb_git_remote_download(VALUE self)
 {
 	int error;
+	rugged_remote *wrapper;
 	git_remote *remote;
-
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	error = git_remote_download(remote);
 	rugged_exception_check(error);
@@ -543,9 +579,11 @@ static int cb_remote__update_tips(const char *refname, const git_oid *src, const
  */
 static VALUE rb_git_remote_update_tips(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	if (rb_block_given_p()) {
 		int exception = 0, error;
@@ -654,9 +692,11 @@ static VALUE rb_git_remote_each(VALUE klass, VALUE rb_repo)
 */
 static VALUE rb_git_remote_save(VALUE self)
 {
+	rugged_remote *wrapper;
 	git_remote *remote;
-
-	Data_Get_Struct(self, git_remote, remote);
+	
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
 
 	rugged_exception_check(
 		git_remote_save(remote)
@@ -691,12 +731,15 @@ static int cb_remote__rename_problem(const char* refspec_name, void *payload)
 */
 static VALUE rb_git_remote_rename(VALUE self, VALUE rb_new_name)
 {
-	git_remote *remote;
 	int error = 0;
 	VALUE rb_refspec_ary = rb_ary_new();
-
+	rugged_remote *wrapper;
+	git_remote *remote;
+	
 	Check_Type(rb_new_name, T_STRING);
-	Data_Get_Struct(self, git_remote, remote);
+	Data_Get_Struct(self, rugged_remote, wrapper);
+	remote = wrapper->remote;
+
 	error = git_remote_rename(
 			remote,
 			StringValueCStr(rb_new_name),
