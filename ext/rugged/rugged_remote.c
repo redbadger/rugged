@@ -34,13 +34,37 @@ static void rb_git_remote__free(rugged_remote *wrapper)
 	xfree(wrapper);
 }
 
+static int cb_remote__update_tips(const char *refname, const git_oid *src, const git_oid *dest, void *payload)
+{
+	VALUE rb_args = rb_ary_new2(3);
+	int *exception = (int *)payload;
+
+	// TODO: Clean this up. Check if @update_tips is set, and if it is, yield to it?
+	if (rb_block_given_p()) {
+		rb_ary_push(rb_args, rb_str_new_utf8(refname));
+		rb_ary_push(rb_args, git_oid_iszero(src) ? Qnil : rugged_create_oid(src));
+		rb_ary_push(rb_args, git_oid_iszero(dest) ? Qnil : rugged_create_oid(dest));
+
+		rb_protect(rb_yield_splat, rb_args, exception);	
+	}
+
+	return *exception ? GIT_ERROR : GIT_OK;
+}
+
 VALUE rugged_remote_new(VALUE klass, VALUE owner, git_remote *remote)
 {
 	VALUE rb_remote;
 	rugged_remote *wrapper = xmalloc(sizeof(rugged_remote));
+	git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
 
 	wrapper->exception = 0;
 	wrapper->remote = remote;
+
+	callbacks.payload = &wrapper->exception;
+	callbacks.update_tips = &cb_remote__update_tips;
+	rugged_exception_check(
+		git_remote_set_callbacks(remote, &callbacks)
+	);
 
 	rb_remote = Data_Wrap_Struct(klass, NULL, &rb_git_remote__free, wrapper);
 	rugged_set_owner(rb_remote, owner);
@@ -552,19 +576,6 @@ static VALUE rb_git_remote_download(VALUE self)
 	return Qnil;
 }
 
-static int cb_remote__update_tips(const char *refname, const git_oid *src, const git_oid *dest, void *payload)
-{
-	VALUE rb_args = rb_ary_new2(3);
-	int *exception = (int *)payload;
-	rb_ary_push(rb_args, rb_str_new_utf8(refname));
-	rb_ary_push(rb_args, git_oid_iszero(src) ? Qnil : rugged_create_oid(src));
-	rb_ary_push(rb_args, git_oid_iszero(dest) ? Qnil : rugged_create_oid(dest));
-
-	rb_protect(rb_yield_splat, rb_args, exception);
-
-	return *exception ? GIT_ERROR : GIT_OK;
-}
-
 /*
  *  call-seq:
  *    remote.update_tips! -> nil
@@ -586,21 +597,11 @@ static VALUE rb_git_remote_update_tips(VALUE self)
 	remote = wrapper->remote;
 
 	if (rb_block_given_p()) {
-		int exception = 0, error;
-		git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
-
-		callbacks.payload = &exception;
-		callbacks.update_tips = &cb_remote__update_tips;
-		rugged_exception_check(
-			git_remote_set_callbacks(remote, &callbacks)
-		);
+		int error, exception;
 
 		error = git_remote_update_tips(remote);
-
-		callbacks.update_tips = NULL;
-		// Don't overwrite the first error we've seen
-		if (!error) error = git_remote_set_callbacks(remote, &callbacks);
-		else git_remote_set_callbacks(remote, &callbacks);
+		exception = wrapper->exception;
+		wrapper->exception = 0;
 
 		if (exception)
 			rb_jump_tag(exception);
