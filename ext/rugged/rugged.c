@@ -394,6 +394,7 @@ void Init_rugged(void)
 	Init_rugged_repo();
 	Init_rugged_revwalk();
 	Init_rugged_reference();
+	Init_rugged_reference_collection();
 	Init_rugged_branch();
 	Init_rugged_config();
 	Init_rugged_remote();
