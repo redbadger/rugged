@@ -46,7 +46,7 @@ module Rugged
     end
 
     def inspect
-      "#<Rugged::Reference:#{object_id} {name: #{name.inspect}, target: #{target.inspect}}>"
+      "#<#{self.class}:#{object_id} {name: #{name.inspect}, target: #{target.inspect}}>"
     end
 
   end
