@@ -1037,7 +1037,7 @@ static VALUE rb_git_repo_set_head(VALUE self, VALUE rb_head)
 	Data_Get_Struct(self, git_repository, repo);
 
 	Check_Type(rb_head, T_STRING);
-	error = git_repository_set_head(repo, StringValueCStr(rb_head));
+	error = git_repository_set_head(repo, StringValueCStr(rb_head), NULL, NULL);
 	rugged_exception_check(error);
 
 	return Qnil;
