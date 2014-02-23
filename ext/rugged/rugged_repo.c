@@ -45,6 +45,8 @@ VALUE rb_cRuggedOdbObject;
 
 static ID id_call;
 
+GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *host, int port);
+
 /*
  *  call-seq:
  *    odb_obj.oid -> hex_oid
@@ -182,9 +184,43 @@ static void load_alternates(git_repository *repo, VALUE rb_alternates)
 	rugged_exception_check(error);
 }
 
+static int repo_open_redis_backend(git_repository **repo, VALUE rb_backend)
+{
+	Check_Type(rb_backend, T_HASH);
+
+	VALUE rb_host = rb_hash_aref(rb_backend, CSTR2SYM("host"));
+	VALUE rb_port = rb_hash_aref(rb_backend, CSTR2SYM("port"));
+
+	Check_Type(rb_host, T_STRING);
+	Check_Type(rb_port, T_FIXNUM);
+
+	char *host = StringValuePtr(rb_host);
+	int port = FIX2INT(rb_port);
+
+	git_odb *odb;
+	git_odb_backend *redis_odb_backend;
+	git_refdb *refdb;
+	git_refdb_backend *redis_refdb_backend;
+	int error;
+
+	error = git_odb_new(&odb);
+	rugged_exception_check(error);
+
+	error = git_odb_backend_hiredis(&redis_odb_backend, host, port);
+	rugged_exception_check(error);
+
+	error = git_odb_add_backend(odb, redis_odb_backend, 1);
+	rugged_exception_check(error);
+
+	error = git_repository_wrap_odb(repo, odb);
+	rugged_exception_check(error);
+
+	return error;
+}
+
 /*
  *  call-seq:
- *    Repository.bare(path[, alternates]) -> repository
+ *    Repository.bare(path, options = {}) -> repository
  *
  *  Open a bare Git repository at +path+ and return a +Repository+
  *  object representing it.
@@ -193,23 +229,50 @@ static void load_alternates(git_repository *repo, VALUE rb_alternates)
  *  any +.git+ directory discovery, won't try to load the config options to
  *  determine whether the repository is bare and won't try to load the workdir.
  *
- *  Optionally, you can pass a list of alternate object folders.
+ *  The following options can be passed in the +options+ Hash:
  *
- *    Rugged::Repository.bare(path, ['./other/repo/.git/objects'])
+ *  :backend ::
+ *    A hash of the backend configuration.
+ *    ex. {:type => :redis, :host => "localhost", :port => 6379}}
+ *  :alternates ::
+ *    A list of alternate object folders. *
+ *    Rugged::Repository.bare(path, :alternates => ['./other/repo/.git/objects'])
  */
 static VALUE rb_git_repo_open_bare(int argc, VALUE *argv, VALUE klass)
 {
-	git_repository *repo;
+	git_repository *repo = NULL;
 	int error = 0;
-	VALUE rb_path, rb_alternates;
+	VALUE rb_path, rb_options;
 
-	rb_scan_args(argc, argv, "11", &rb_path, &rb_alternates);
-	Check_Type(rb_path, T_STRING);
+	rb_scan_args(argc, argv, "10:", &rb_path, &rb_options);
 
-	error = git_repository_open_bare(&repo, StringValueCStr(rb_path));
-	rugged_exception_check(error);
+	if (!NIL_P(rb_options)) {
+		/* Check for `:backend` */
+		VALUE rb_backend = rb_hash_aref(rb_options, CSTR2SYM("backend"));
+		printf("Requested backend\n");
 
-	load_alternates(repo, rb_alternates);
+		if (rb_backend && !NIL_P(rb_backend)) {
+			VALUE rb_backend_type = rb_hash_aref(rb_backend, CSTR2SYM("type"));
+			if(rb_intern("redis") == SYM2ID(rb_backend_type)) {
+				printf("Requested redis backend\n");
+				error = repo_open_redis_backend(&repo, rb_backend);
+				printf("Redis output: %d\n", error);
+				rugged_exception_check(error);
+			}
+		}
+	}
+
+	if (!repo) {
+		Check_Type(rb_path, T_STRING);
+
+		error = git_repository_open_bare(&repo, StringValueCStr(rb_path));
+		rugged_exception_check(error);
+	}
+
+	if (!NIL_P(rb_options)) {
+		/* Check for `:alternates` */
+		load_alternates(repo, rb_hash_aref(rb_options, CSTR2SYM("alternates")));
+	}
 
 	return rugged_repo_new(klass, repo);
 }
@@ -565,7 +628,7 @@ static VALUE rb_git_repo_clone_at(int argc, VALUE *argv, VALUE klass)
 	parse_clone_options(&options, rb_options_hash, &remote_payload);
 
 	error = git_clone(&repo, StringValueCStr(url), StringValueCStr(local_path), &options);
-	
+
 	if (RTEST(remote_payload.exception))
 		rb_jump_tag(remote_payload.exception);
 	rugged_exception_check(error);
