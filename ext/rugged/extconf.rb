@@ -77,4 +77,45 @@ else
   end
 end
 
+# Compile backends
+
+CWD ||= File.expand_path(File.dirname(__FILE__))
+LIBGIT2_BACKENDS_DIR = File.join(CWD, '..', '..', 'vendor', 'libgit2-backends')
+
+if find_executable('cmake')
+
+  {'redis' => ['hiredis']}.each do |backend, deps|
+    Dir.chdir(File.join(LIBGIT2_BACKENDS_DIR, backend)) do
+      Dir.mkdir("build") if !Dir.exists?("build")
+      Dir.chdir("build") do
+        sys("cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC ")
+        sys(MAKE_PROGRAM)
+      end
+    end
+
+    dir_config('git2-#{backend}', "#{LIBGIT2_BACKENDS_DIR}/#{backend}", "#{LIBGIT2_BACKENDS_DIR}/#{backend}/build")
+    #deps.each do |d|
+    #  dir_config(d)
+    #end
+
+    unless have_library "git2-#{backend}"
+      abort "ERROR: Failed to build libgit2-#{backend}"
+    end
+
+    deps.each do |d|
+      unless have_library(d)
+        abort "ERROR: Failed to locate #{d}"
+      end
+    end
+  end
+
+else
+  warn "WARN: CMake was not found!"
+  warn "WARN: Rugged will be built without alternative backends support!"
+end
+
+unless have_library 'git2' and have_header 'git2.h'
+  abort "ERROR: Failed to build libgit2"
+end
+
 create_makefile("rugged/rugged")
