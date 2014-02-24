@@ -45,7 +45,7 @@ VALUE rb_cRuggedOdbObject;
 
 static ID id_call;
 
-GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *host, int port);
+GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *path, const char *host, int port);
 
 /*
  *  call-seq:
@@ -184,7 +184,7 @@ static void load_alternates(git_repository *repo, VALUE rb_alternates)
 	rugged_exception_check(error);
 }
 
-static int repo_open_redis_backend(git_repository **repo, VALUE rb_backend)
+static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE rb_backend)
 {
 	Check_Type(rb_backend, T_HASH);
 
@@ -195,6 +195,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_backend)
 	Check_Type(rb_port, T_FIXNUM);
 
 	char *host = StringValuePtr(rb_host);
+	char *path = StringValuePtr(rb_path);
 	int port = FIX2INT(rb_port);
 
 	git_odb *odb;
@@ -206,7 +207,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_backend)
 	error = git_odb_new(&odb);
 	rugged_exception_check(error);
 
-	error = git_odb_backend_hiredis(&redis_odb_backend, host, port);
+	error = git_odb_backend_hiredis(&redis_odb_backend, path, host, port);
 	rugged_exception_check(error);
 
 	error = git_odb_add_backend(odb, redis_odb_backend, 1);
@@ -249,14 +250,11 @@ static VALUE rb_git_repo_open_bare(int argc, VALUE *argv, VALUE klass)
 	if (!NIL_P(rb_options)) {
 		/* Check for `:backend` */
 		VALUE rb_backend = rb_hash_aref(rb_options, CSTR2SYM("backend"));
-		printf("Requested backend\n");
 
 		if (rb_backend && !NIL_P(rb_backend)) {
 			VALUE rb_backend_type = rb_hash_aref(rb_backend, CSTR2SYM("type"));
 			if(rb_intern("redis") == SYM2ID(rb_backend_type)) {
-				printf("Requested redis backend\n");
-				error = repo_open_redis_backend(&repo, rb_backend);
-				printf("Redis output: %d\n", error);
+				error = repo_open_redis_backend(&repo, rb_path, rb_backend);
 				rugged_exception_check(error);
 			}
 		}
@@ -839,7 +837,8 @@ static VALUE rb_git_repo_exists(VALUE self, VALUE hex)
 	Data_Get_Struct(self, git_repository, repo);
 	Check_Type(hex, T_STRING);
 
-	error = git_oid_fromstr(&oid, StringValueCStr(hex));
+	char* str_id = StringValueCStr(hex);
+	error = git_oid_fromstr(&oid, str_id);
 	rugged_exception_check(error);
 
 	error = git_repository_odb(&odb, repo);
@@ -900,7 +899,7 @@ static VALUE rb_git_repo_read_header(VALUE self, VALUE hex)
 	Data_Get_Struct(self, git_repository, repo);
 	Check_Type(hex, T_STRING);
 
-	error = git_oid_fromstr(&oid, StringValueCStr(hex));
+	error = git_oid_fromstr(&oid, StringValuePtr(hex));
 	rugged_exception_check(error);
 
 	error = git_repository_odb(&odb, repo);

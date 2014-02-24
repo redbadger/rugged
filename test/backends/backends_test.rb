@@ -7,7 +7,7 @@ BACKENDS = [
 class BackendTest < MiniTest::Unit::TestCase
   def setup
     @repos = BACKENDS.map do |backend_conf|
-      Rugged::Repository.bare("test", backend: backend_conf)
+      Rugged::Repository.bare("test_repo", backend: backend_conf)
     end
   end
 
@@ -16,27 +16,50 @@ class BackendTest < MiniTest::Unit::TestCase
       yield(repo)
     end
   end
+
+  def teardown
+
+  end
 end
 
 # do not inherit from Rugged::TestCase, we're not touching the disk
 class OdbTest < BackendTest
-
   def test_can_write
     each_backend do |repo|
-      oid = repo.write("Test content", :blob)
+      oid = repo.write("Test", :blob)
       assert_match(/^[a-f0-9]+$/, oid)
     end
   end
 
   def test_can_test_existence
-    skip("pending writing")
+    each_backend do |repo|
+      oid1 = "1000000000000000000000000000000000000001"
+      assert_equal(false, repo.exists?(oid1))
+
+      oid2 = repo.write("Test content", :blob)
+      assert_equal(true, repo.exists?(oid2))
+    end
   end
 
   def test_can_read_back
-    skip("pending writing")
+    each_backend do |repo|
+      oid = repo.write("Another test content", :blob)
+
+      object = repo.read(oid)
+
+      assert_equal(:blob, object.type)
+      assert_equal("Another test content", object.data)
+    end
   end
 
   def test_can_read_header
-    skip("pending writing")
+    each_backend do |repo|
+      oid = repo.write("12345", :blob)
+
+      header = repo.read_header(oid)
+
+      assert_equal(:blob, header[:type])
+      assert_equal(5, header[:len])
+    end
   end
 end
