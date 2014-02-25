@@ -321,7 +321,7 @@ static VALUE rb_git_repo_new(int argc, VALUE *argv, VALUE klass)
 
 /*
  *  call-seq:
- *    Repository.init_at(path, is_bare = false) -> repository
+ *    Repository.init_at(path, is_bare = false, opts = {}) -> repository
  *
  *  Initialize a Git repository in +path+. This implies creating all the
  *  necessary files on the FS, or re-initializing an already existing
@@ -333,19 +333,41 @@ static VALUE rb_git_repo_new(int argc, VALUE *argv, VALUE klass)
  *  of +path+. Non-bare repositories are created in a +.git+ folder and
  *  use +path+ as working directory.
  *
+ *  The following options can be passed in the +options+ Hash:
+ *
+ *  :backend ::
+ *    A hash of the backend configuration.
+ *    ex. {:type => :redis, :host => "localhost", :port => 6379}}
+ *
+ *
  *    Rugged::Repository.init_at('~/repository', :bare) #=> #<Rugged::Repository:0x108849488>
  */
 static VALUE rb_git_repo_init_at(int argc, VALUE *argv, VALUE klass)
 {
-	git_repository *repo;
-	VALUE rb_path, rb_is_bare;
+	git_repository *repo = NULL;
+	VALUE rb_path, rb_is_bare, rb_options;
+	int error;
 
-	rb_scan_args(argc, argv, "11", &rb_path, &rb_is_bare);
+	rb_scan_args(argc, argv, "11:", &rb_path, &rb_is_bare, &rb_options);
 	Check_Type(rb_path, T_STRING);
 
-	rugged_exception_check(
-		git_repository_init(&repo, StringValueCStr(rb_path), RTEST(rb_is_bare))
-	);
+	if (!NIL_P(rb_options)) {
+		/* Check for `:backend` */
+		VALUE rb_backend = rb_hash_aref(rb_options, CSTR2SYM("backend"));
+
+		if (rb_backend && !NIL_P(rb_backend)) {
+			VALUE rb_backend_type = rb_hash_aref(rb_backend, CSTR2SYM("type"));
+			if(rb_intern("redis") == SYM2ID(rb_backend_type)) {
+				error = repo_open_redis_backend(&repo, rb_path, rb_backend);
+				rugged_exception_check(error);
+			}
+		}
+	}
+
+	if(!repo) {
+		error =	git_repository_init(&repo, StringValueCStr(rb_path), RTEST(rb_is_bare));
+		rugged_exception_check(error);
+	}
 
 	return rugged_repo_new(klass, repo);
 }
@@ -1135,7 +1157,8 @@ static VALUE rb_git_repo_get_head(VALUE self)
  *    repo.path -> path
  *
  *  Return the full, normalized path to this repository. For non-bare repositories,
- *  this is the path of the actual +.git+ folder, not the working directory.
+ *  this is the path of the actual +.git+ folder, not the working directory. When
+ *  a non-disk backend is used, this returns nil.
  *
  *    repo.path #=> "/home/foo/workthing/.git"
  */
@@ -1143,7 +1166,12 @@ static VALUE rb_git_repo_path(VALUE self)
 {
 	git_repository *repo;
 	Data_Get_Struct(self, git_repository, repo);
-	return rb_str_new_utf8(git_repository_path(repo));
+	char *path = git_repository_path(repo);
+
+	if(path != NULL)
+		return rb_str_new_utf8(path);
+	else
+		return Qnil;
 }
 
 /*
