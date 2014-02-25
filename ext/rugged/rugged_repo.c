@@ -24,6 +24,9 @@
 
 #include "rugged.h"
 #include <git2/sys/repository.h>
+#include <git2/sys/odb_backend.h>
+#include <git2/sys/refdb_backend.h>
+#include <git2/refs.h>
 
 extern VALUE rb_mRugged;
 extern VALUE rb_eRuggedError;
@@ -46,6 +49,7 @@ VALUE rb_cRuggedOdbObject;
 static ID id_call;
 
 GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *path, const char *host, int port);
+GIT_EXTERN(int) git_refdb_backend_hiredis(git_refdb_backend **backend_out, const char *path, const char *host, int port);
 
 /*
  *  call-seq:
@@ -202,6 +206,9 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	git_odb_backend *redis_odb_backend;
 	git_refdb *refdb;
 	git_refdb_backend *redis_refdb_backend;
+	git_reference *head;
+
+	int head_err = 0;
 	int error;
 
 	error = git_odb_new(&odb);
@@ -215,6 +222,27 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 
 	error = git_repository_wrap_odb(repo, odb);
 	rugged_exception_check(error);
+
+	error = git_refdb_new(&refdb, *repo);
+	rugged_exception_check(error);
+
+	error = git_refdb_backend_hiredis(&redis_refdb_backend, path, host, port);
+	rugged_exception_check(error);
+
+	error = git_refdb_set_backend(refdb, redis_refdb_backend);
+	rugged_exception_check(error);
+
+	git_repository_set_refdb(*repo, refdb);
+
+	head_err = git_reference_lookup(&head, *repo, "HEAD");
+
+	if (head_err == GIT_ENOTFOUND) {
+		head_err = git_reference_symbolic_create(&head, *repo, "HEAD", "refs/heads/master", 0, NULL, NULL);
+	}
+
+	if (!head_err) {
+		git_reference_free(head);
+	}
 
 	return error;
 }
