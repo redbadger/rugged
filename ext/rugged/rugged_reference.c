@@ -146,10 +146,12 @@ static VALUE rb_git_ref_lookup(VALUE klass, VALUE rb_repo, VALUE rb_name)
 	Check_Type(rb_name, T_STRING);
 
 	error = git_reference_lookup(&ref, repo, StringValueCStr(rb_name));
-	if (error == GIT_ENOTFOUND)
+	if (error == GIT_ENOTFOUND) {
+		giterr_clear();
 		return Qnil;
-	else
+	} else {
 		rugged_exception_check(error);
+	}
 
 	return rugged_ref_new(klass, rb_repo, ref);
 }
@@ -194,9 +196,10 @@ static VALUE rb_git_ref_peel(VALUE self)
 	Data_Get_Struct(self, git_reference, ref);
 
 	error = git_reference_peel(&object, ref, GIT_OBJ_ANY);
-	if (error == GIT_ENOTFOUND)
+	if (error == GIT_ENOTFOUND) {
+		giterr_clear();
 		return Qnil;
-	else
+	} else
 		rugged_exception_check(error);
 
 	if (git_reference_type(ref) == GIT_REF_OID &&
@@ -229,9 +232,10 @@ static VALUE rb_git_ref_exist(VALUE klass, VALUE rb_repo, VALUE rb_name)
 	error = git_reference_lookup(&ref, repo, StringValueCStr(rb_name));
 	git_reference_free(ref);
 
-	if (error == GIT_ENOTFOUND)
+	if (error == GIT_ENOTFOUND) {
+		giterr_clear();
 		return Qfalse;
-	else
+	} else
 		rugged_exception_check(error);
 
 	return Qtrue;
@@ -516,7 +520,7 @@ static VALUE rb_git_ref_rename(int argc, VALUE *argv, VALUE self)
  *  call-seq:
  *    reference.delete! -> nil
  *
- *  Delete this reference from disk. 
+ *  Delete this reference from disk.
  *
  *    reference.name #=> 'HEAD'
  *    reference.delete!

@@ -237,6 +237,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	head_err = git_reference_lookup(&head, *repo, "HEAD");
 
 	if (head_err == GIT_ENOTFOUND) {
+		giterr_clear();
 		head_err = git_reference_symbolic_create(&head, *repo, "HEAD", "refs/heads/master", 0, NULL, NULL);
 	}
 
