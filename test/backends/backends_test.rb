@@ -16,10 +16,6 @@ class BackendTest < MiniTest::Unit::TestCase
       yield(repo)
     end
   end
-
-  def teardown
-
-  end
 end
 
 # do not inherit from Rugged::TestCase, we're not touching the disk
@@ -63,3 +59,138 @@ class OdbTest < BackendTest
     end
   end
 end
+
+class RefdbTest < BackendTest
+  def teardown
+    each_backend do |repo|
+      [
+        "HEAD",
+        "refs/heads/test",
+        "refs/heads/master",
+        "refs/heads/test1",
+        "refs/heads/test2"
+      ].each do |ref_name|
+        ref = Rugged::Reference.lookup(repo, ref_name)
+        ref.delete! if ref
+      end
+    end
+  end
+
+  def test_can_lookup
+    each_backend do |repo|
+      ref = Rugged::Reference.lookup(repo, "refs/heads/nope")
+
+      assert_nil(ref)
+
+      oid = repo.write("Test object for reference", :blob)
+      Rugged::Reference.create(repo, "refs/heads/test", oid)
+      ref = Rugged::Reference.lookup(repo, "refs/heads/test")
+
+      refute_nil(ref)
+
+      assert_equal(oid, ref.target)
+      assert_equal(:direct, ref.type)
+      assert_equal("refs/heads/test", ref.name)
+    end
+  end
+
+  def test_can_lookup_symbolic
+    each_backend do |repo|
+      oid = repo.write("Test object for reference", :blob)
+      Rugged::Reference.create(repo, "refs/heads/master", oid)
+      ref = Rugged::Reference.lookup(repo, "HEAD")
+
+      refute_nil(ref)
+
+      assert_equal("refs/heads/master", ref.target)
+      assert_equal(:symbolic, ref.type)
+      assert_equal("HEAD", ref.name)
+    end
+  end
+
+  def test_can_rename
+    each_backend do |repo|
+      oid = repo.write("Test object for reference", :blob)
+      ref = Rugged::Reference.create(repo, "refs/heads/test1", oid)
+
+      new_ref = ref.rename("refs/heads/test2")
+
+      refute_nil(new_ref)
+      assert_equal("refs/heads/test2", new_ref.name)
+      assert_equal(:direct, new_ref.type)
+      assert_equal(oid, new_ref.target)
+    end
+  end
+
+  def test_can_delete
+    each_backend do |repo|
+      oid = repo.write("Test object for reference", :blob)
+      ref = Rugged::Reference.create(repo, "refs/heads/test", oid)
+
+      ref.delete!
+      new_ref = Rugged::Reference.lookup(repo, "refs/heads/test")
+
+      assert_nil(new_ref);
+    end
+  end
+
+  def test_can_iterate_refs
+    each_backend do |repo|
+      assert_kind_of(Enumerator, repo.refs)
+
+      n = 0
+      Rugged::Reference.each(repo) do |ref|
+        assert_kind_of(Rugged::Reference, ref)
+        n += 1
+      end
+
+      assert_operator(1, :<=, n)
+    end
+  end
+
+  def test_can_iterate_ref_names
+    each_backend do |repo|
+      assert_kind_of(Enumerator, repo.refs)
+
+      n = 0
+      Rugged::Reference.each_name(repo) do |ref|
+        assert_kind_of(String, ref)
+        assert_match(/^[a-zA-Z\/]+$/, ref)
+        n += 1
+      end
+
+      assert_operator(1, :<=, n)
+    end
+  end
+
+  def test_can_iterate_refs_with_glob
+    refs = ["refs/heads/master", "refs/heads/test1", "refs/heads/test2"]
+    exp = ["refs/heads/test1", "refs/heads/test2"]
+
+    each_backend do |repo|
+      oid = repo.write("Test object for reference", :blob)
+      refs.each {|ref| Rugged::Reference.create(repo, ref, oid) }
+
+      names = []
+      Rugged::Reference.each_name(repo, "refs/heads/test*") { |name| names << name }
+
+      assert_equal(exp, names.sort)
+    end
+  end
+
+  def test_can_iterate_ref_names_with_glob
+    refs = ["refs/heads/master", "refs/heads/test1", "refs/heads/test2"]
+    exp = ["refs/heads/test1", "refs/heads/test2"]
+
+    each_backend do |repo|
+      oid = repo.write("Test object for reference", :blob)
+      refs.each {|ref| Rugged::Reference.create(repo, ref, oid) }
+
+      names = repo.refs("refs/heads/test*").map { |r| r.name }
+
+      assert_equal(exp, names.sort)
+    end
+  end
+
+end
+
