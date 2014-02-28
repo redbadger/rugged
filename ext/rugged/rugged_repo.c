@@ -48,8 +48,8 @@ VALUE rb_cRuggedOdbObject;
 
 static ID id_call;
 
-GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *path, const char *host, int port);
-GIT_EXTERN(int) git_refdb_backend_hiredis(git_refdb_backend **backend_out, const char *path, const char *host, int port);
+GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *prefix, const char *path, const char *host, int port);
+GIT_EXTERN(int) git_refdb_backend_hiredis(git_refdb_backend **backend_out, const char *prefix, const char *path, const char *host, int port);
 
 /*
  *  call-seq:
@@ -214,7 +214,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	error = git_odb_new(&odb);
 	rugged_exception_check(error);
 
-	error = git_odb_backend_hiredis(&redis_odb_backend, path, host, port);
+	error = git_odb_backend_hiredis(&redis_odb_backend, "rugged", path, host, port);
 	rugged_exception_check(error);
 
 	error = git_odb_add_backend(odb, redis_odb_backend, 1);
@@ -226,7 +226,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	error = git_refdb_new(&refdb, *repo);
 	rugged_exception_check(error);
 
-	error = git_refdb_backend_hiredis(&redis_refdb_backend, path, host, port);
+	error = git_refdb_backend_hiredis(&redis_refdb_backend, "rugged", path, host, port);
 	rugged_exception_check(error);
 
 	error = git_refdb_set_backend(refdb, redis_refdb_backend);
