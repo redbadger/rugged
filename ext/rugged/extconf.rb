@@ -77,18 +77,18 @@ unless have_library 'git2' and have_header 'git2.h'
 end
 
 
-hiredis_dir = File.expand_path(File.join(File.dirname(__FILE__), %w{.. .. vendor hiredis}))
-unless File.directory?(hiredis_dir)
+HIREDIS_DIR = File.expand_path(File.join(File.dirname(__FILE__), %w{.. .. vendor hiredis}))
+unless File.directory?(HIREDIS_DIR)
   STDERR.puts "vendor/hiredis missing, please checkout its submodule..."
   exit 1
 end
 
 # Make sure hiredis is built...
-system("cd #{hiredis_dir} && make static")
+system("cd #{HIREDIS_DIR} && make static")
 
 # Statically link to hiredis (mkmf can't do this for us)
 
-dir_config('hiredis', hiredis_dir, hiredis_dir)
+dir_config('hiredis', HIREDIS_DIR, HIREDIS_DIR)
 have_library('hiredis') or raise
 
 # Compile backends
@@ -102,7 +102,15 @@ if find_executable('cmake')
     Dir.chdir(File.join(LIBGIT2_BACKENDS_DIR, backend)) do
       Dir.mkdir("build") if !Dir.exists?("build")
       Dir.chdir("build") do
-        sys("cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC -DPC_LIBGIT2_LIBRARY_DIRS=#{LIBGIT2_DIR}/build/ -DPC_LIBGIT2_INCLUDE_DIRS=#{LIBGIT2_DIR}/include/")
+        cmake_args = [
+          "-DBUILD_SHARED_LIBS=OFF",
+          "-DCMAKE_C_FLAGS=-fPIC",
+          "-DPC_LIBGIT2_LIBRARY_DIRS=#{LIBGIT2_DIR}/build/",
+          "-DPC_LIBGIT2_INCLUDE_DIRS=#{LIBGIT2_DIR}/include/",
+          "-DPC_LIBHIREDIS_LIBRARY_DIRS=#{HIREDIS_DIR}",
+          "-DPC_LIBHIREDIS_INCLUDE_DIRS=#{HIREDIS_DIR}"
+        ]
+        sys("cmake .. " + cmake_args.join(" "))
         sys(MAKE_PROGRAM)
       end
     end
