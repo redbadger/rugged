@@ -76,6 +76,8 @@ unless have_library 'git2' and have_header 'git2.h'
   abort "ERROR: Failed to build libgit2"
 end
 
+have_library('hiredis') or raise
+
 # Compile backends
 
 CWD ||= File.expand_path(File.dirname(__FILE__))
