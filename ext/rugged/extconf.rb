@@ -102,7 +102,7 @@ if find_executable('cmake')
     Dir.chdir(File.join(LIBGIT2_BACKENDS_DIR, backend)) do
       Dir.mkdir("build") if !Dir.exists?("build")
       Dir.chdir("build") do
-        sys("cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC -DPC_LIBGIT2_LIBRARY_DIRS=../../libgit2/build/ -DPC_LIBGIT2_INCLUDE_DIRS=../../libgit2/include/")
+        sys("cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC -DPC_LIBGIT2_LIBRARY_DIRS=#{LIBGIT2_DIR}/build/ -DPC_LIBGIT2_INCLUDE_DIRS=#{LIBGIT2_DIR}/include/")
         sys(MAKE_PROGRAM)
       end
     end
