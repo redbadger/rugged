@@ -48,8 +48,8 @@ VALUE rb_cRuggedOdbObject;
 
 static ID id_call;
 
-GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *prefix, const char *path, const char *host, int port);
-GIT_EXTERN(int) git_refdb_backend_hiredis(git_refdb_backend **backend_out, const char *prefix, const char *path, const char *host, int port);
+GIT_EXTERN(int) git_odb_backend_hiredis(git_odb_backend **backend_out, const char *prefix, const char *path, const char *host, int port, char *password);
+GIT_EXTERN(int) git_refdb_backend_hiredis(git_refdb_backend **backend_out, const char *prefix, const char *path, const char *host, int port, char *password);
 
 /*
  *  call-seq:
@@ -194,13 +194,21 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 
 	VALUE rb_host = rb_hash_aref(rb_backend, CSTR2SYM("host"));
 	VALUE rb_port = rb_hash_aref(rb_backend, CSTR2SYM("port"));
+	VALUE rb_password = rb_hash_aref(rb_backend, CSTR2SYM("password"));
 
 	Check_Type(rb_host, T_STRING);
 	Check_Type(rb_port, T_FIXNUM);
 
+
 	char *host = StringValuePtr(rb_host);
 	char *path = StringValuePtr(rb_path);
 	int port = FIX2INT(rb_port);
+	char *password = NULL;
+
+	if(rb_password != Qnil) {
+		Check_Type(rb_password, T_STRING);
+		password = StringValuePtr(rb_password);
+	}
 
 	git_odb *odb;
 	git_odb_backend *redis_odb_backend;
@@ -214,7 +222,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	error = git_odb_new(&odb);
 	rugged_exception_check(error);
 
-	error = git_odb_backend_hiredis(&redis_odb_backend, "rugged", path, host, port);
+	error = git_odb_backend_hiredis(&redis_odb_backend, "rugged", path, host, port, password);
 	rugged_exception_check(error);
 
 	error = git_odb_add_backend(odb, redis_odb_backend, 1);
@@ -226,7 +234,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	error = git_refdb_new(&refdb, *repo);
 	rugged_exception_check(error);
 
-	error = git_refdb_backend_hiredis(&redis_refdb_backend, "rugged", path, host, port);
+	error = git_refdb_backend_hiredis(&redis_refdb_backend, "rugged", path, host, port, password);
 	rugged_exception_check(error);
 
 	error = git_refdb_set_backend(refdb, redis_refdb_backend);
