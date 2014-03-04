@@ -77,7 +77,7 @@ unless have_library 'git2' and have_header 'git2.h'
 end
 
 
-HIREDIS_DIR = File.expand_path(File.join(File.dirname(__FILE__), %w{.. .. vendor hiredis}))
+HIREDIS_DIR = File.join(CWD, '..', '..', 'vendor', 'hiredis')
 unless File.directory?(HIREDIS_DIR)
   STDERR.puts "vendor/hiredis missing, please checkout its submodule..."
   exit 1

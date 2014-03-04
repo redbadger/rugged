@@ -205,7 +205,7 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 	int port = FIX2INT(rb_port);
 	char *password = NULL;
 
-	if(rb_password != Qnil) {
+	if(!NIL_P(rb_password)) {
 		Check_Type(rb_password, T_STRING);
 		password = StringValuePtr(rb_password);
 	}
