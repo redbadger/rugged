@@ -96,9 +96,8 @@ have_library('hiredis') or raise
 CWD ||= File.expand_path(File.dirname(__FILE__))
 LIBGIT2_BACKENDS_DIR = File.join(CWD, '..', '..', 'vendor', 'libgit2-backends')
 
-if find_executable('cmake')
-
-  {'redis' => ['hiredis']}.each do |backend, deps|
+{'redis' => ['hiredis']}.each do |backend, deps|
+  if find_executable('cmake')
     Dir.chdir(File.join(LIBGIT2_BACKENDS_DIR, backend)) do
       Dir.mkdir("build") if !Dir.exists?("build")
       Dir.chdir("build") do
@@ -115,7 +114,7 @@ if find_executable('cmake')
       end
     end
 
-    dir_config('git2-#{backend}', "#{LIBGIT2_BACKENDS_DIR}/#{backend}", "#{LIBGIT2_BACKENDS_DIR}/#{backend}/build")
+    dir_config("git2-#{backend}", "#{LIBGIT2_BACKENDS_DIR}/#{backend}", "#{LIBGIT2_BACKENDS_DIR}/#{backend}/build")
     #deps.each do |d|
     #  dir_config(d)
     #end
@@ -129,11 +128,19 @@ if find_executable('cmake')
         abort "ERROR: Failed to locate #{d}"
       end
     end
-  end
+  else
+    warn "WARN: CMake was not found!"
 
-else
-  warn "WARN: CMake was not found!"
-  warn "WARN: Rugged will be built without alternative backends support!"
+    Dir.chdir(File.join(LIBGIT2_BACKENDS_DIR, backend)) do
+      if File.exists?('Makefile-rugged.embed')
+        sys("#{MAKE_PROGRAM} -f Makefile-rugged.embed")
+        dir_config("git2-#{backend}", "#{LIBGIT2_BACKENDS_DIR}/#{backend}/", "#{LIBGIT2_BACKENDS_DIR}/#{backend}/")
+        have_library("git2-#{backend}") or raise
+      else
+        warn "WARN: Rugged will be built without #{backend} support!"
+      end
+    end
+  end
 end
 
 unless have_library 'git2' and have_header 'git2.h'

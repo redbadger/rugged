@@ -18,8 +18,6 @@ end
 Rake::ExtensionTask.new('rugged', gemspec) do |r|
   r.lib_dir = 'lib/rugged'
 
-  r.config_options << "--with-git2-redis-lib"
-
   r.cross_platform = ["i386-mingw32", "x64-mingw32"]
   r.cross_compile = true
 
