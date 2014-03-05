@@ -190,6 +190,7 @@ static void load_alternates(git_repository *repo, VALUE rb_alternates)
 
 static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE rb_backend)
 {
+	Check_Type(rb_path, T_STRING);
 	Check_Type(rb_backend, T_HASH);
 
 	VALUE rb_host = rb_hash_aref(rb_backend, CSTR2SYM("host"));
@@ -198,7 +199,6 @@ static int repo_open_redis_backend(git_repository **repo, VALUE rb_path, VALUE r
 
 	Check_Type(rb_host, T_STRING);
 	Check_Type(rb_port, T_FIXNUM);
-
 
 	char *host = StringValuePtr(rb_host);
 	char *path = StringValuePtr(rb_path);
