@@ -78,8 +78,15 @@ namespace :clean do
   task :libgit2 do
     FileUtils.rm_rf("vendor/libgit2/build")
   end
+
+  task :libgit2_backends do
+    Dir.glob("vendor/libgit2-backends/*/build").each do |d|
+      FileUtils.rm_rf(d)
+    end
+  end
 end
 Rake::Task[:clean].prerequisites << "clean:libgit2"
+Rake::Task[:clean].prerequisites << "clean:libgit2_backends"
 
 desc "Open an irb session preloaded with Rugged"
 task :console do
