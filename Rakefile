@@ -65,3 +65,9 @@ begin
 rescue LoadError
 end
 
+desc "Build and release v#{gemspec.version} to Gemfury"
+task :release => :gem do
+  sh "curl -F package=@pkg/rugged-#{gemspec.version}.gem https://#{ENV.fetch('GEMFURY_TOKEN')}@push.fury.io/#{ENV.fetch('GEMFURY_USERNAME')}/"
+  sh "git tag v#{gemspec.version} -m 'Release #{gemspec.version}'"
+  sh "git push origin v#{gemspec.version}"
+end
